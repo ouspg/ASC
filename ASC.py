@@ -4,7 +4,6 @@ import re
 import argparse
 import hashlib
 
-
 # Colors from here https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
 class bcolors:
     HEADER = '\033[95m'
