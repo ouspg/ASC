@@ -2,7 +2,6 @@ import json
 from haralyzer import HarParser, HarPage
 import re
 import argparse
-import hashlib
 
 # Colors from here https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
 class bcolors:
@@ -87,7 +86,7 @@ def analyze(all_methods, har_parser):
 
         # Create unique sets
         url_unique_set = set()
-        payload_unique_hash_set = set()
+        payload_unique_set = set()
 
         # Loop through HAR entries
         for page in har_parser.pages:
@@ -100,15 +99,13 @@ def analyze(all_methods, har_parser):
                     method['count'] += 1
                     url_unique_set.add(url)
 
-                    # Use hash function to find unique POST payloads
+                    # Collect payloads as string
                     if (method_type.upper() == 'POST') or (method_type.upper() == 'PUT'):
-                        post_string = str(json.dumps(entry["request"]["postData"])).encode('utf-8')
-                        hash_object = hashlib.sha512(post_string)
-                        hex_dig = hash_object.hexdigest()
-                        payload_unique_hash_set.add(hex_dig)
+                        post_string = str(json.dumps(entry["request"]["postData"]))
+                        payload_unique_set.add(post_string)
 
         method['count_unique_url'] = len(url_unique_set)
-        method['count_unique_payload'] = len(payload_unique_hash_set)
+        method['count_unique_payload'] = len(payload_unique_set)
 
     return all_methods
 
