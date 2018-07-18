@@ -20,7 +20,8 @@ method_info = {
     'path': "",
     'method': "",
     'possible_parameters': {},
-    'possible_response_codes': {},
+    'possible_response_codes': [],
+    'detected_response_codes': [],
     'count': 0,
     'count_unique_url': 0,
     'count_unique_payload': 0,
@@ -45,6 +46,13 @@ def read_api_spec(apispecfile):
         for method in data["paths"][endpoint]:
             method_info['path'] = path
             method_info['method'] = method
+
+            response_codes = []
+            #print(data["paths"][endpoint][method])
+            for response_code in data["paths"][endpoint][method]["responses"]:
+                response_codes.append(response_code)
+
+            method_info['possible_response_codes'] = response_codes.copy()
             all_methods.append(method_info.copy())
 
     return all_methods
@@ -65,6 +73,16 @@ def print_results(result):
 
         if (method['method'].upper() == 'POST') or (method['method'].upper() == 'PUT'):
             print("UNIQUE POST/PUT PAYLOADS: " + str(method['count_unique_payload']))
+
+        for defined_response_code in method['possible_response_codes']:
+            if defined_response_code in method['detected_response_codes']:
+                print(bcolors.OKGREEN + "RESPONSE CODE " + str(defined_response_code) + " OCCURED" + bcolors.ENDC)
+            else:
+                print(bcolors.FAIL + "RESPONSE CODE " + str(defined_response_code) + " NOT OCCURED" + bcolors.ENDC)
+
+        for detected_response_code in method['detected_response_codes']:
+            if detected_response_code not in method['possible_response_codes']:
+                print(bcolors.FAIL + "UNDEFINED RESPONSE CODE " + str(detected_response_code) + " OCCURED" + bcolors.ENDC)
 
         print("")
 
@@ -87,17 +105,20 @@ def analyze(all_methods, har_parser):
         # Create unique sets
         url_unique_set = set()
         payload_unique_set = set()
+        response_codes_unique_set = set()
 
         # Loop through HAR entries
         for page in har_parser.pages:
             for entry in page.entries:
                 url = entry["request"]["url"]
                 method_type = entry["request"]["method"]
+                response_code = entry["response"]["status"]
 
                 # Regexping different urls might need more testing
                 if re.search(method_path + "([^/]|$|[?])", url) and (method_type.lower() == method["method"].lower()):
                     method['count'] += 1
                     url_unique_set.add(url)
+                    response_codes_unique_set.add(str(response_code))
 
                     # Collect payloads as string
                     if (method_type.upper() == 'POST') or (method_type.upper() == 'PUT'):
@@ -106,6 +127,7 @@ def analyze(all_methods, har_parser):
 
         method['count_unique_url'] = len(url_unique_set)
         method['count_unique_payload'] = len(payload_unique_set)
+        method['detected_response_codes'] = list(response_codes_unique_set)
 
     return all_methods
 
