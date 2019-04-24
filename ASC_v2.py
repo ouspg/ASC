@@ -6,6 +6,8 @@ import copy
 from jsonschema import validate
 from jsonschema import validators
 
+from time import time
+
 from prance import ResolvingParser
 
 # Colors from here https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
@@ -42,14 +44,32 @@ class Endpoint:
         for mtd in self.methods.keys():
             self.methods[mtd].analyze()
 
+    def methodsNotUsed(self):
+        # Simply returns array of methods existing but not used (GET POST etc)
+        methods_not_used = []
+        for mtd in self.methods.keys():
+            if not self.methods[mtd].isUsed():
+                methods_not_used.append(mtd)
+
+        return methods_not_used
+
+    def isUsed(self):
+        # Simply true or false depending that if there is even single usage of this endpoint
+        for mtd in self.methods.keys():
+            if self.methods[mtd].isUsed():
+                return True
+
+        return False
+
 
 # Class for single method
 class SingleMethod:
-    def __init__(self, type, path, methodinfo):
-        self.type = type
+    def __init__(self, type, path, methodinfo, parameters):
+        self.type = type # type or method?
         self.path = path
-        self.response_schemas = ""
-        self.parameters = ""
+        self.response_schemas = "" #will this be futile?
+        self.parameters = parameters # array of parameter objects
+        print(self.parameters)
         self.methodinfo = methodinfo
 
         # Array of entries
@@ -61,14 +81,36 @@ class SingleMethod:
         # Add single entry to list
         self.logs.append(entry)
 
+    def isUsed(self):
+        # returns true or false depending on count
+        if len(self.logs) > 0:
+            return True
+        else:
+            return False
+
+    def responsesNotUsed(self):
+        # return array of responses not used
+        # returns as list, receiver checks if empty
+        # how to handle default response stuff?
+        response_not_used = []
+        for response in self.analysis_result["responses_info"]['responses'].keys():
+            #print(response)
+            #print(self.analysis_result["responses_info"]['responses'][response])
+            if self.analysis_result["responses_info"]['responses'][response]['analysis']['count'] == 0:
+                response_not_used.append(response)
+        return response_not_used
+
     def analyze(self):
         # Make endpoint method analysis with all entries
 
         # Dict to store analysis results
+
+        # TODO: Looks like operationid is not used
         analysis = {
             'method': self.type,
             'operationId': "",
             'request_info': "",
+            'request_info_requestbody': "",
             'responses_info': "",
             'anomaly_entries': [],
             'total_count': 0
@@ -77,7 +119,31 @@ class SingleMethod:
         # Get total count
         analysis['total_count'] = len(self.logs)
 
-        analysis_requests = self.methodinfo['parameters']
+        analysis_requestbody = None
+
+        #print(self.methodinfo)
+        if 'parameters' in self.methodinfo.keys():
+            analysis_requests = self.methodinfo['parameters']
+            print(analysis_requests)
+        else:
+            #looking for requestbody
+            #set up termporary empty parameters
+
+            analysis_requests = []
+            #analysis_requestbodies = []
+            if 'requestBody' in self.methodinfo.keys():
+                analysis_requestbody = self.methodinfo['requestBody']
+                analysis_requestbody['analysis'] = {
+                    'values': [],
+                    'count': 0
+                }
+            # for v3
+
+
+        # TODO: make it work with v3 too
+        #there is no always parameters in v3, in stead there is requestbody
+        # check if there v2 spec has no parameters as required
+        # path item can acually contain params item too, if operation item holds something it overrides those then
 
         for param in analysis_requests:
 
@@ -100,33 +166,48 @@ class SingleMethod:
         for entry in self.logs:
             url = entry['request']['url']
 
-            for param in analysis_requests:
+            # TODO: replace this looping by looping every entry through parameter objects should be cleaner
+            # doing that removes need of usage of param analysis
+
+
+            #for param in analysis_requests:
+            for param in self.parameters:
+
                 # TODO: Works only with one path parameter
-                if param['in'] == 'path':
+                if param.location == 'path':
+                #if param['in'] == 'path':
+                    # TODO: can param name used as checker where stuff is placed?
                     if '{' in self.path and '}' in self.path:
                         # Seek parameter value and handle it default way
-                        prepart = self.path.split('{' + param['name'] + '}')[0]
+                        #prepart = self.path.split('{' + param['name'] + '}')[0]
+                        prepart = self.path.split('{' + param.name + '}')[0]
                         paramvalue = re.search(prepart + '(.*)([^/]|$|[?])', url).group(1)
 
-                        param['analysis']['values'].append(paramvalue)
-                        param['analysis']['count'] += 1
+                        #param['analysis']['values'].append(paramvalue)
+                        #param['analysis']['count'] += 1
+                        param.addUsage(paramvalue)
 
                     # TODO: Make anomaly entry if parameter not found
 
-                elif param['in'] == 'query':
+                #elif param['in'] == 'query':
+                elif param.location == 'query':
                     # Check query parameters as default way
+                    # Is query params always required?
                     parameter_found = False
 
                     for queryparameter in entry['request']['queryString']:
-                        if queryparameter['name'] == param['name']:
+                        #if queryparameter['name'] == param['name']:
+                        if queryparameter['name'] == param.name:
                             paramvalue = queryparameter['value']
-                            param['analysis']['values'].append(paramvalue)
-                            param['analysis']['count'] += 1
+                            #param['analysis']['values'].append(paramvalue)
+                            #param['analysis']['count'] += 1
+                            param.addUsage(paramvalue)
                             parameter_found = True
 
                     # Add anomaly if required parameter does not exist
 
-                    if param['required'] and not parameter_found:
+                    #if param['required'] and not parameter_found:
+                    if param.required and not parameter_found:
                         # Anomaly because of required parameter is not found
                         anomaly = {
                             "entry": entry,
@@ -136,18 +217,22 @@ class SingleMethod:
 
                         analysis['anomaly_entries'].append(anomaly)
 
-                elif param['in'] == 'header':
+                #elif param['in'] == 'header':
+                elif param.location == 'header':
                     # Check request header parameters as default way
                     parameter_found = False
 
                     for headerparameter in entry['request']['headers']:
-                        if headerparameter['name'] == param['name']:
+                        #if headerparameter['name'] == param['name']:
+                        if headerparameter['name'] == param.name:
                             paramvalue = headerparameter['value']
-                            param['analysis']['values'].append(paramvalue)
-                            param['analysis']['count'] += 1
+                            #param['analysis']['values'].append(paramvalue)
+                            #param['analysis']['count'] += 1
+                            param.addUsage(paramvalue)
 
                     # Add anomaly because request header parameter is not found
-                    if param['required'] and not parameter_found:
+                    #if param['required'] and not parameter_found:
+                    if param.required and not parameter_found:
                         # Anomaly because of required parameter is not found
                         anomaly = {
                             "entry": entry,
@@ -157,14 +242,16 @@ class SingleMethod:
 
                         analysis['anomaly_entries'].append(anomaly)
 
-                elif param['in'] == 'body':
+                #elif param['in'] == 'body':
+                elif param.location == 'body':
                     # Checks body content of request
                     # Validates request body with given schema by json schema validator
                     # Checks if request body json is broken
 
                     paramvalue = entry['request']['postData']['text']
-                    param['analysis']['values'].append(paramvalue)
-                    param['analysis']['count'] += 1
+                    #param['analysis']['values'].append(paramvalue)
+                    #param['analysis']['count'] += 1
+                    param.addUsage(paramvalue)
 
                     # TODO: Possibly new feature to check and handle single schema fields as parameters if needed
 
@@ -197,15 +284,17 @@ class SingleMethod:
                             analysis['anomaly_entries'].append(anomaly)
 
                     pass
-                elif param['in'] == 'formData':
+                #elif param['in'] == 'formData':
+                elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR
                     # Parsing and analyzing data from there
                     if 'params' in entry['request']['postData']:
                         for formparam in entry['request']['postData']['params']:
                             if formparam['name'] == param['name']:
                                 paramvalue = formparam['value']
-                                param['analysis']['values'].append(paramvalue)
-                                param['analysis']['count'] += 1
+                                #param['analysis']['values'].append(paramvalue)
+                                #param['analysis']['count'] += 1
+                                param.addUsage(paramvalue)
 
                             # TODO: Detect if parameter has some anomality or not corresponding API spec
 
@@ -214,12 +303,33 @@ class SingleMethod:
                         bound = get_multipart_boundary(entry['request'])
                         parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
 
-                        for p_name, p_value in parseddata:
-                            if p_name == param['name']:
-                                param['analysis']['values'].append(p_value)
-                                param['analysis']['count'] += 1
+                        for p_name, paramvalue in parseddata:
+                            #if p_name == param['name']:
+                            if p_name == param.name:
+                                #param['analysis']['values'].append(paramvalue)
+                                #param['analysis']['count'] += 1
+                                param.addUsage(paramvalue)
 
                             # TODO: Detect if parameter has some anomality or not corresponding API spec
+
+            # Analyze entry from the viewpoint of requestbodyparameter (OA v3) if it exists
+            if analysis_requestbody != None:
+                #flow
+                #check if postdata have params or text field (same as upper formData stuff)
+                #just get uniqueness and validate schema, no more for now
+                #should it just add more params to the list aka parse schema and just make new set of params
+                if 'params' in entry['request']['postData']:
+                    # Is this futile?
+                    print("params values")
+                    print(entry['request']['postData']['params'])
+                elif 'text' in entry['request']['postData']:
+                    print("text values")
+                    print(entry['request']['postData']['text'])
+                    # tehdään eka oletuksella että text valueissa on asiat
+                    body = entry['request']['postData']['text']
+                    analysis_requestbody['analysis']['values'].append(body)
+                    analysis_requestbody['analysis']['count'] += 1
+
 
             # Analyzing responses
             response_code = str(entry['response']['status'])
@@ -272,17 +382,30 @@ class SingleMethod:
         print('')
         print("Parameters occurred in requests:")
 
-        for param in self.analysis_result['request_info']:
-            param_occurrence_count = param['analysis']["count"]
+        print(self.parameters)
+
+        # Rewriting params analysis code because of new class
+        #for param in self.analysis_result['request_info']:
+        for param in self.parameters:
+            #param_occurrence_count = param['analysis']["count"]
 
             # Does not preserve order
-            param_occurrence_count_unique = len(list(set(param['analysis']["values"])))
+            #param_occurrence_count_unique = len(list(set(param['analysis']["values"])))
+            param_occurrence_count_unique = len(param.unique_values)
 
-            if param_occurrence_count == 0:
-                print("\t" + bcolors.FAIL + f"Parameter named {param['name']} never occurred" + bcolors.ENDC)
+            #if param_occurrence_count == 0:
+            if param.usage_count == 0:
+                #print("\t" + bcolors.FAIL + f"Parameter named {param['name']} never occurred" + bcolors.ENDC)
+                print("\t" + bcolors.FAIL + f"Parameter named {param.name} never occurred" + bcolors.ENDC)
             else:
-                print("\t" + bcolors.OKGREEN + f"Parameter named {param['name']}  occurred {param_occurrence_count} time(s)" + bcolors.ENDC)
+                #print("\t" + bcolors.OKGREEN + f"Parameter named {param['name']}  occurred {param_occurrence_count} time(s)" + bcolors.ENDC)
+                print("\t" + bcolors.OKGREEN + f"Parameter named {param.name}  occurred {param.usage_count} time(s)" + bcolors.ENDC)
+
                 print("\t" + "\t" + f"Unique valued occurrences: {param_occurrence_count_unique}")
+
+        if self.analysis_result['request_info_requestbody'] != "":
+            print("Parameters from requestBody (OAv3)")
+
 
         print('')
         print("Responses occurred:")
@@ -323,31 +446,43 @@ class Schema:
 
 
 class Parameter:
-    '''
-    Not yet used anywhere
-    '''
-    def __init__(self):
-        self.name = ""
-        self.location = "" #Possibly enum?
-        self.required = "" #Boolean
-        self.schema = "" #Schema json
+    def __init__(self, name, location, required=False, schema=None):
+        self.name = name
+        self.location = location #Possibly enum? (header path query formdata body cookie, should make own requestbody?)
+        self.required = required #Boolean, tämäkin vähän turha
+        self.schema = schema #Schema json, ei pakollinen vielä
+        self.usage_count = 0
+        self.unique_values = set()
+
+    def addUsage(self, value):
+        # Increase counter and add value if uniq
+        self.usage_count = self.usage_count + 1
+        self.unique_values.add(value)
+
+
+
 
 class ASC:
-    def __init__(self, apispec_addr, har_addr):
+    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
 
         self.apispec = ""
         self.harobject = ""
 
-        self.options = ""
+        self.options = "" # Is most likely futile
 
         self.endpoints = {}
         self.basepath = ""
 
+        # pitääkö olla exclude from report tai exclude from jenking?
+        self.endpoints_excluded = endpoints_excluded
+        self.coverage_level_required = coverage_level_required
+
+
     def makeharparser(self):
         # Initialize har parser object
-        with open(self.har_addr , 'r') as f:
+        with open(self.har_addr, 'r') as f:
             self.harobject = HarParser(json.loads(f.read()))
 
     def getapispec(self):
@@ -356,16 +491,63 @@ class ASC:
 
     def parseapispec(self):
         # Parse API spec to endpoint and method objects with prance parser
-        specparser = ResolvingParser(self.apispec_addr)
+
+        # NOTICE: OA v2 seems to be working fine with openapi spec validator and swagger validator too
+
+        # TODO: detect if v2 or v3
+        specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
+        print(specparser.specification)
 
         self.apispec = specparser.specification
         paths = specparser.specification['paths']
 
         for endpoint in paths.keys():
+
+            params_endpoint = []
+            # TODO: if params in endpoint, then parse here
+            if 'parameters' in paths[endpoint].keys():
+                # Common parameters for endpoint exists
+                for param in paths[endpoint]['parameters']:
+                    params_endpoint.append(Parameter(param['name'], param['in']))
+
+
             mthds = {}
             for method in paths[endpoint].keys():
+                # Operation params can override endpoint params
+                params_operation = []
+
+                # TODO: Parse and create param objects here, override if something were at endpoint level
+
+                if 'parameters' in paths[endpoint][method].keys():
+                    # Common parameters for endpoint exists
+                    for param in paths[endpoint][method]['parameters']:
+                        params_operation.append(Parameter(param['name'], param['in']))
+
+                if 'requestBody' in paths[endpoint][method].keys():
+                    # OA V3
+                    # TODO: consider how to apply schemas in this
+                    params_operation.append(Parameter('requestBody', 'requestbody'))
+
+                #TODO: eliminate from endpoit params if something has name name (overriding)
+
+                # TODO maybe here some mistake which causes all parametres duplication
+                # Add here only params which are not duplicate (overriden endpoint params are dropped)
+                params_final = []
+
+                for p_e in params_operation:
+                    overriden = False
+                    for p_o in params_endpoint:
+                        if p_o.name == p_e.name:
+                            overriden = True
+                            break
+                    if not overriden:
+                        params_final.append(p_e)
+
+                # Add all operation params
+                params_final.extend(params_operation)
+
                 minfo = copy.deepcopy(paths[endpoint][method])
-                mthds[method] = SingleMethod(method, endpoint, minfo)
+                mthds[method] = SingleMethod(method, endpoint, minfo, params_final)
             self.endpoints[endpoint] = (Endpoint(endpoint, mthds))
 
     def preparsehar(self):
@@ -410,21 +592,127 @@ class ASC:
         for endpoint in self.endpoints.keys():
             self.endpoints[endpoint].outputAnalysis()
 
+    def exportjsonreport(self):
+        # Exports json report
+
+        # flow kerää ja dictit vaan aina oikean endpontin alle jne
+
+        # TODO: Determine proper json format and output as file
+        for endpoint in self.endpoints.keys():
+            for method in self.endpoints[endpoint].methods.keys():
+                print(self.endpoints[endpoint].methods[method].analysis_result)
+
+    def analyze_coverage(self):
+        '''
+        Checks if given coverage level is fullfilled
+        Save and return failures if it is not fullfilled
+        If failures exist, return true, otherwise false in order to main function to crash program
+        :return:
+        '''
+        # TODO: If 'treat undefined response as error' flag or something is specified, add it here accordingly
+        # TODO: If coverage level 4 (=parameter coverage) is added, add it here accordingly
+
+        # Coverage based on given level to determine if failed or not and failure reasons as string array
+        coverage_level_fulfilled = True
+        coverage_level_failure_reasons = []
+
+        if self.coverage_level_required == None:
+            # TODO: return or create empty raport
+            pass
+        if self.coverage_level_required == "1":
+            # Check endpoint coverage
+            for endpoint in self.endpoints.keys():
+                # Skip excluded endpoints
+                if endpoint in self.endpoints_excluded:
+                    continue
+
+                if not self.endpoints[endpoint].isUsed():
+                    coverage_level_fulfilled = False
+                    # Add failure and reason
+                    coverage_level_failure_reasons.append(f"Endpoint {endpoint} is not used")
+
+        if self.coverage_level_required == "2":
+            # Check method coverage
+            for endpoint in self.endpoints.keys():
+                # Skip excluded endpoints
+                if endpoint in self.endpoints_excluded:
+                    continue
+
+                if len(self.endpoints[endpoint].methodsNotUsed()) > 0:
+                    coverage_level_fulfilled = False
+                    for mtd in self.endpoints[endpoint].methodsNotUsed():
+                        coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} is not used")
+
+        if self.coverage_level_required == "3":
+            # Check response coverage
+            for endpoint in self.endpoints.keys():
+                # Skip excluded endpoints
+                if endpoint in self.endpoints_excluded:
+                    continue
+
+                for mtd in self.endpoints[endpoint].methods.keys():
+                    responses_not_used = self.endpoints[endpoint].methods[mtd].responsesNotUsed()
+                    for resp in responses_not_used:
+                        coverage_level_fulfilled = False
+                        coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} response {resp} is not used")
+
+
+        #if not coverage_level_fulfilled:
+        #    print(coverage_level_failure_reasons)
+        #    exit(1)
+
+        # should instead of returning these be put on some class field?
+
+        return coverage_level_fulfilled, coverage_level_failure_reasons
+
+
+    def export_failure_report(self):
+        '''
+        Saves the failure report to file
+        Name of the file is not specified by command line args asc_failure_report_timestamp
+        Overwrites file if same name exists
+        Creates empty file if no failures exist
+        :return:
+        '''
+
+        coverage_level_achieved, failures = self.analyze_coverage()
+
+        # TODO: Make argument possible
+        # TODO: add timestamps to filename?
+        failure_report_filename = "failure_report.txt"
+
+        # TODO: Actual schema instead of simple text file or stuff?
+
+        with open(failure_report_filename, 'w') as file:
+            for fail in failures:
+                file.write(fail + "\n")
+
+
+    def export_large_report(self):
+        # TODO: Luodaan iso rapsa, ei vaikutuksia ajomoodeilla, kaikki anomaliat ja vähäisetkin virheet mukaan
+        pass
 
 def main():
     parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
     parser.add_argument('apispec', help='Api specification file')
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
+    parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 100% cov expected always. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
+    parser.add_argument('--exclude', nargs='+', type=str, help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
 
+    # TODO: Add suppression of console output arguments (so report not outputted to command line, default is yes console output)
     args = parser.parse_args()
 
-    asc = ASC(args.apispec, args.harfile)
+    print(args.coveragelevel)
+
+    asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude)
 
     asc.parseapispec()
     asc.makeharparser()
     asc.preparsehar()
     asc.analyze()
     asc.exportresults()
+    asc.export_failure_report()
+    #asc.analyze_coverage()
 
 def get_multipart_boundary(req_entry):
 
