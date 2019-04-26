@@ -6,6 +6,8 @@ import copy
 from jsonschema import validate
 from jsonschema import validators
 
+from urllib.parse import urlparse
+
 from time import time
 
 from prance import ResolvingParser
@@ -31,6 +33,32 @@ class Endpoint:
         # Input entry under correct method
         method_type = entry['request']['method'].lower()
         self.methods[method_type].addEntry(entry)
+
+    def matchUrlToPath(self, url):
+        '''
+        Just determines if url matches this endpoints path
+        :param url:
+        :return boolean:
+        '''
+
+        url_parsed = urlparse(url)
+
+        if '{' in self.path and '}' in self.path:
+            # Path parameters are present which makes things harder
+            #should regexp matching be tried? replace all {} with anything but slash
+            pass
+
+        else:
+            # No path parameters
+
+            # can path end with slash at all with parsing with urllib?
+            if url_parsed.path.endswith(self.path):
+                return True
+
+
+        # No match found
+        return False
+
 
     def outputAnalysis(self):
         # Print analysis
@@ -382,7 +410,6 @@ class SingleMethod:
         print('')
         print("Parameters occurred in requests:")
 
-        print(self.parameters)
 
         # Rewriting params analysis code because of new class
         #for param in self.analysis_result['request_info']:
@@ -501,49 +528,44 @@ class ASC:
         self.apispec = specparser.specification
         paths = specparser.specification['paths']
 
+        # Parse endpoints
         for endpoint in paths.keys():
+            # Parse endpoint specific parameters if those exist
 
             params_endpoint = []
-            # TODO: if params in endpoint, then parse here
             if 'parameters' in paths[endpoint].keys():
                 # Common parameters for endpoint exists
                 for param in paths[endpoint]['parameters']:
                     params_endpoint.append(Parameter(param['name'], param['in']))
 
-
             mthds = {}
+
             for method in paths[endpoint].keys():
                 # Operation params can override endpoint params
                 params_operation = []
-
-                # TODO: Parse and create param objects here, override if something were at endpoint level
 
                 if 'parameters' in paths[endpoint][method].keys():
                     # Common parameters for endpoint exists
                     for param in paths[endpoint][method]['parameters']:
                         params_operation.append(Parameter(param['name'], param['in']))
 
+                # OpenAPI v3 has requestbody field instead of form and body parameters
                 if 'requestBody' in paths[endpoint][method].keys():
                     # OA V3
-                    # TODO: consider how to apply schemas in this
+                    # TODO: consider how to apply schemas in this and think requestbody things
                     params_operation.append(Parameter('requestBody', 'requestbody'))
 
-                #TODO: eliminate from endpoit params if something has name name (overriding)
 
-                # TODO maybe here some mistake which causes all parametres duplication
                 # Add here only params which are not duplicate (overriden endpoint params are dropped)
                 params_final = []
 
-                for p_e in params_operation:
-                    overriden = False
-                    for p_o in params_endpoint:
-                        if p_o.name == p_e.name:
-                            overriden = True
-                            break
-                    if not overriden:
+                # Add endpoint parameters to final parameters if those are not overriden in method
+                for p_e in params_endpoint:
+                    if not any(p_o.name == p_e for p_o in params_operation):
                         params_final.append(p_e)
 
-                # Add all operation params
+
+                # Add all operation parameters to final array
                 params_final.extend(params_operation)
 
                 minfo = copy.deepcopy(paths[endpoint][method])
