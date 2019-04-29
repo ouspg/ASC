@@ -34,27 +34,36 @@ class Endpoint:
         method_type = entry['request']['method'].lower()
         self.methods[method_type].addEntry(entry)
 
-    def matchUrlToPath(self, url):
+    def matchUrlToPath(self, url, basepath=""):
         '''
         Just determines if url matches this endpoints path
         :param url:
+        :param basepath:
         :return boolean:
         '''
 
         url_parsed = urlparse(url)
 
         if '{' in self.path and '}' in self.path:
-            # Path parameters are present which makes things harder
-            #should regexp matching be tried? replace all {} with anything but slash
+            # TODO: Consider if basepath parameter is needed at all
+            # Create search pattern by replacing path parameter with 'anything-but-slash' wildcard
+            search_pattern = re.sub('{.+}', '[^/]+', self.path) + "$"
+
+            #print(search_pattern)
+            #print(url_parsed.path)
+
+            # Check if path matches to url
+            if re.search(search_pattern, url_parsed.path):
+                #print("FOUND________________")
+                return True
+
             pass
 
         else:
             # No path parameters
-
-            # can path end with slash at all with parsing with urllib?
+            # TODO: Check if urllib may produce trailing slash to end of path
             if url_parsed.path.endswith(self.path):
                 return True
-
 
         # No match found
         return False
@@ -318,7 +327,8 @@ class SingleMethod:
                     # Parsing and analyzing data from there
                     if 'params' in entry['request']['postData']:
                         for formparam in entry['request']['postData']['params']:
-                            if formparam['name'] == param['name']:
+                            #if formparam['name'] == param['name']:
+                            if formparam['name'] == param.name:
                                 paramvalue = formparam['value']
                                 #param['analysis']['values'].append(paramvalue)
                                 #param['analysis']['count'] += 1
@@ -503,7 +513,10 @@ class ASC:
         self.basepath = ""
 
         # pitääkö olla exclude from report tai exclude from jenking?
-        self.endpoints_excluded = endpoints_excluded
+
+        # TODO: fix this parameter setting to be sensible, currently not working if give nothing
+        #self.endpoints_excluded = endpoints_excluded
+        self.endpoints_excluded = []
         self.coverage_level_required = coverage_level_required
 
 
@@ -574,6 +587,19 @@ class ASC:
 
     def preparsehar(self):
         # Parse har file entries to correct endpoints to wait for analysis
+
+        # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
+        for page in self.harobject.pages:
+            for entry in page.entries:
+                url = entry['request']['url']
+
+                for endpoint in self.endpoints.keys():
+                    if self.endpoints[endpoint].matchUrlToPath(url):
+                        self.endpoints[endpoint].inputLogEntry(entry)
+                        break
+
+        return
+        '''
         for page in self.harobject.pages:
             for entry in page.entries:
                 url = entry['request']['url']
@@ -603,6 +629,7 @@ class ASC:
                         if urltotest.endswith(path) or urltotest.endswith(path + '/'):
                             self.endpoints[path].inputLogEntry(entry)
                             break
+        '''
 
     def analyze(self):
         # Trigger every endppoint analysis
