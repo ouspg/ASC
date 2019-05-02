@@ -29,12 +29,12 @@ class Endpoint:
         self.path = path
         self.methods = methods
 
-    def inputLogEntry(self, entry):
+    def input_log_entry(self, entry):
         # Input entry under correct method
         method_type = entry['request']['method'].lower()
-        self.methods[method_type].addEntry(entry)
+        self.methods[method_type].add_entry(entry)
 
-    def matchUrlToPath(self, url, basepath=""):
+    def match_url_to_path(self, url, basepath=""):
         '''
         Just determines if url matches this endpoints path
         :param url:
@@ -68,32 +68,31 @@ class Endpoint:
         # No match found
         return False
 
-
-    def outputAnalysis(self):
+    def print_endpoint_analysis_to_console(self):
         # Print analysis
         for mtd in self.methods.keys():
             print(bcolors.HEADER + f"Endpoint {self.path} - method {mtd}" + bcolors.ENDC)
-            self.methods[mtd].printAnalysis()
+            self.methods[mtd].print_method_analysis_to_console()
             print('')
             print('')
 
-    def analyzeAll(self):
+    def analyze_endpoint(self):
         for mtd in self.methods.keys():
             self.methods[mtd].analyze()
 
-    def methodsNotUsed(self):
+    def get_methods_not_used(self):
         # Simply returns array of methods existing but not used (GET POST etc)
         methods_not_used = []
         for mtd in self.methods.keys():
-            if not self.methods[mtd].isUsed():
+            if not self.methods[mtd].is_used():
                 methods_not_used.append(mtd)
 
         return methods_not_used
 
-    def isUsed(self):
+    def is_used(self):
         # Simply true or false depending that if there is even single usage of this endpoint
         for mtd in self.methods.keys():
-            if self.methods[mtd].isUsed():
+            if self.methods[mtd].is_used():
                 return True
 
         return False
@@ -114,33 +113,29 @@ class SingleMethod:
 
         self.analysis_result = ""
 
-    def addEntry(self, entry):
+    def add_entry(self, entry):
         # Add single entry to list
         self.logs.append(entry)
 
-    def isUsed(self):
+    def is_used(self):
         # returns true or false depending on count
         if len(self.logs) > 0:
             return True
         else:
             return False
 
-    def responsesNotUsed(self):
+    def get_responses_not_used(self):
         # return array of responses not used
         # returns as list, receiver checks if empty
         # how to handle default response stuff?
         response_not_used = []
         for response in self.analysis_result["responses_info"]['responses'].keys():
-            #print(response)
-            #print(self.analysis_result["responses_info"]['responses'][response])
             if self.analysis_result["responses_info"]['responses'][response]['analysis']['count'] == 0:
                 response_not_used.append(response)
         return response_not_used
 
     def analyze(self):
-        # Make endpoint method analysis with all entries
-
-        # Dict to store analysis results
+        # Run analysis for this method and store all analysis for later inspections
 
         # TODO: Looks like operationid is not used
         analysis = {
@@ -409,7 +404,7 @@ class SingleMethod:
 
         self.analysis_result = analysis
 
-    def printAnalysis(self):
+    def print_method_analysis_to_console(self):
         # Just prints analysis fancy way
         if self.analysis_result['total_count'] == 0:
             print("\t" + bcolors.FAIL + f"Total number of request/responses: {self.analysis_result['total_count']}" + bcolors.ENDC)
@@ -482,6 +477,7 @@ class Schema:
         self.payload = ""
 
 
+# TODO: should enum be added to location?
 class Parameter:
     def __init__(self, name, location, required=False, schema=None):
         self.name = name
@@ -497,10 +493,9 @@ class Parameter:
         self.unique_values.add(value)
 
 
-
-
 class ASC:
-    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0):
+    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0,
+                 crash_in_coverage_failure=True):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
 
@@ -512,31 +507,33 @@ class ASC:
         self.endpoints = {}
         self.basepath = ""
 
-        # pitääkö olla exclude from report tai exclude from jenking?
+        self.crash_in_coverage_failure = crash_in_coverage_failure
+
+        self.version = ""
+
+        # TODO: add "crash if failures noted parameter" for jenkins
 
         # TODO: fix this parameter setting to be sensible, currently not working if give nothing
         #self.endpoints_excluded = endpoints_excluded
         self.endpoints_excluded = []
         self.coverage_level_required = coverage_level_required
 
-
-    def makeharparser(self):
+    def read_har_file(self):
         # Initialize har parser object
         with open(self.har_addr, 'r') as f:
             self.harobject = HarParser(json.loads(f.read()))
 
-    def getapispec(self):
-        # Might be futile as prance parser already uses URL to get spec
-        pass
-
-    def parseapispec(self):
+    def read_api_specification(self):
         # Parse API spec to endpoint and method objects with prance parser
 
         # NOTICE: OA v2 seems to be working fine with openapi spec validator and swagger validator too
 
-        # TODO: detect if v2 or v3
         specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
-        print(specparser.specification)
+        #print(specparser.specification)
+
+
+        # TODO: filter all allowed versions here and if spec is not supported then print error
+        self.version = specparser.version
 
         self.apispec = specparser.specification
         paths = specparser.specification['paths']
@@ -585,68 +582,33 @@ class ASC:
                 mthds[method] = SingleMethod(method, endpoint, minfo, params_final)
             self.endpoints[endpoint] = (Endpoint(endpoint, mthds))
 
-    def preparsehar(self):
-        # Parse har file entries to correct endpoints to wait for analysis
+    def preprocess_har_entries(self):
+        # Classify and filter out har entries to correct endpoints to wait for analysis
 
         # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
         for page in self.harobject.pages:
             for entry in page.entries:
                 url = entry['request']['url']
-
                 for endpoint in self.endpoints.keys():
-                    if self.endpoints[endpoint].matchUrlToPath(url):
-                        self.endpoints[endpoint].inputLogEntry(entry)
+                    if self.endpoints[endpoint].match_url_to_path(url):
+                        self.endpoints[endpoint].input_log_entry(entry)
                         break
-
-        return
-        '''
-        for page in self.harobject.pages:
-            for entry in page.entries:
-                url = entry['request']['url']
-
-                # TODO: Does not work with 2 path parameters
-                for path in self.endpoints.keys():
-                    if '{' in path and '}' in path:
-                        prepart = path.split('{')[0]
-                        afterpart = path.split('}')[1]
-
-                        # TODO: Might mess with query parameters
-                        if re.search(prepart, url):
-                            if (len(afterpart) > 0) and (url.endswith(afterpart)):
-                                self.endpoints[path].inputLogEntry(entry)
-                                break
-
-                            elif len(afterpart) == 0:
-                                urlafterpart = url.split(prepart)[1]
-                                if '/' not in urlafterpart:
-                                    self.endpoints[path].inputLogEntry(entry)
-                                    break
-
-                    else:
-                        # TODO: Check if works with same time with query and path parameters
-                        urltotest = url.split("?")[0]
-
-                        if urltotest.endswith(path) or urltotest.endswith(path + '/'):
-                            self.endpoints[path].inputLogEntry(entry)
-                            break
-        '''
 
     def analyze(self):
         # Trigger every endppoint analysis
         for endpoint in self.endpoints.keys():
-            self.endpoints[endpoint].analyzeAll()
+            self.endpoints[endpoint].analyze_endpoint()
 
-    def exportresults(self):
+    def print_analysis_to_console(self):
         # Export results to command line
         for endpoint in self.endpoints.keys():
-            self.endpoints[endpoint].outputAnalysis()
+            self.endpoints[endpoint].print_endpoint_analysis_to_console()
 
-    def exportjsonreport(self):
+    def export_large_report_json(self):
         # Exports json report
+        # Collect all dictionaries of endpoints and output them in raport
 
-        # flow kerää ja dictit vaan aina oikean endpontin alle jne
-
-        # TODO: Determine proper json format and output as file
+        # TODO: Determine proper json format and output as file, is schema needed?
         for endpoint in self.endpoints.keys():
             for method in self.endpoints[endpoint].methods.keys():
                 print(self.endpoints[endpoint].methods[method].analysis_result)
@@ -666,7 +628,7 @@ class ASC:
         coverage_level_failure_reasons = []
 
         if self.coverage_level_required == None:
-            # TODO: return or create empty raport
+            # Failure analysis and failure report is not made at all
             pass
         if self.coverage_level_required == "1":
             # Check endpoint coverage
@@ -675,7 +637,7 @@ class ASC:
                 if endpoint in self.endpoints_excluded:
                     continue
 
-                if not self.endpoints[endpoint].isUsed():
+                if not self.endpoints[endpoint].is_used():
                     coverage_level_fulfilled = False
                     # Add failure and reason
                     coverage_level_failure_reasons.append(f"Endpoint {endpoint} is not used")
@@ -687,9 +649,9 @@ class ASC:
                 if endpoint in self.endpoints_excluded:
                     continue
 
-                if len(self.endpoints[endpoint].methodsNotUsed()) > 0:
+                if len(self.endpoints[endpoint].get_methods_not_used()) > 0:
                     coverage_level_fulfilled = False
-                    for mtd in self.endpoints[endpoint].methodsNotUsed():
+                    for mtd in self.endpoints[endpoint].get_methods_not_used():
                         coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} is not used")
 
         if self.coverage_level_required == "3":
@@ -700,24 +662,17 @@ class ASC:
                     continue
 
                 for mtd in self.endpoints[endpoint].methods.keys():
-                    responses_not_used = self.endpoints[endpoint].methods[mtd].responsesNotUsed()
+                    responses_not_used = self.endpoints[endpoint].methods[mtd].get_responses_not_used()
                     for resp in responses_not_used:
                         coverage_level_fulfilled = False
                         coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} response {resp} is not used")
 
-
-        #if not coverage_level_fulfilled:
-        #    print(coverage_level_failure_reasons)
-        #    exit(1)
-
-        # should instead of returning these be put on some class field?
-
         return coverage_level_fulfilled, coverage_level_failure_reasons
 
 
-    def export_failure_report(self):
+    def export_failure_report(self, failure_report_filename):
         '''
-        Saves the failure report to file
+        Saves the failure report to file named filename
         Name of the file is not specified by command line args asc_failure_report_timestamp
         Overwrites file if same name exists
         Creates empty file if no failures exist
@@ -726,43 +681,46 @@ class ASC:
 
         coverage_level_achieved, failures = self.analyze_coverage()
 
-        # TODO: Make argument possible
-        # TODO: add timestamps to filename?
-        failure_report_filename = "failure_report.txt"
-
         # TODO: Actual schema instead of simple text file or stuff?
 
         with open(failure_report_filename, 'w') as file:
             for fail in failures:
                 file.write(fail + "\n")
 
+    def export_large_report_text(self):
+        # TODO: Luodaan ihmisluettava iso rapsa, ei vaikutuksia ajomoodeilla, kaikki anomaliat ja vähäisetkin virheet mukaan
+        pass
 
-    def export_large_report(self):
-        # TODO: Luodaan iso rapsa, ei vaikutuksia ajomoodeilla, kaikki anomaliat ja vähäisetkin virheet mukaan
+    def crash_program(self):
+        # Crash program if needed
         pass
 
 def main():
     parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
     parser.add_argument('apispec', help='Api specification file')
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
+    parser.add_argument('failurereportname', nargs="?", type=str, default="failure_report.txt")
     parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 100% cov expected always. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
     parser.add_argument('--exclude', nargs='+', type=str, help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
+    parser.add_argument('--suppressconsole', help="Suppress console outputs, default false")
+    parser.add_argument('--dontcrashincoveragefailure', help="Do not crash program in the end if coverage level is not fullfilled")
 
     # TODO: Add suppression of console output arguments (so report not outputted to command line, default is yes console output)
     args = parser.parse_args()
 
-    print(args.coveragelevel)
-
     asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude)
 
-    asc.parseapispec()
-    asc.makeharparser()
-    asc.preparsehar()
+    asc.read_api_specification()
+    asc.read_har_file()
+    asc.preprocess_har_entries()
     asc.analyze()
-    asc.exportresults()
-    asc.export_failure_report()
+    asc.print_analysis_to_console()
+    asc.export_failure_report(args.failurereportname)
     #asc.analyze_coverage()
+    asc.crash_program()
 
+
+# TODO: Move both functions to utils
 def get_multipart_boundary(req_entry):
 
     for header in req_entry['headers']:
@@ -772,6 +730,7 @@ def get_multipart_boundary(req_entry):
             return boundvalue
 
 
+# TODO: Improve readibility
 def decode_multipart(text, boundary):
     # Returns array of tuple name-value pairs
     splitted_text = text.split(boundary)
@@ -787,16 +746,14 @@ def decode_multipart(text, boundary):
 
     for a_item in actual_items:
         namesearch = re.search('name="(.*?)"', a_item)
-
         namevalue = namesearch.group(1)
-
         valuesearch = re.search('\r\n\r\n([\s\S]*)\r\n', a_item)
-
         valuevalue = valuesearch.group(1)
 
         parsed_items.append((namevalue, valuevalue))
 
     return  parsed_items
+
 
 if __name__ == '__main__':
     main()
