@@ -137,7 +137,7 @@ class SingleMethod:
     def analyze(self):
         # Run analysis for this method and store all analysis for later inspections
 
-        # TODO: Looks like operationid is not used
+        # TODO: Looks like operationid is not used, might be needed better structures and everything here too
         analysis = {
             'method': self.type,
             'operationId': "",
@@ -172,10 +172,7 @@ class SingleMethod:
             # for v3
 
 
-        # TODO: make it work with v3 too
-        #there is no always parameters in v3, in stead there is requestbody
-        # check if there v2 spec has no parameters as required
-        # path item can acually contain params item too, if operation item holds something it overrides those then
+        # Should be working with api spec 3 too now
 
         for param in analysis_requests:
 
@@ -198,11 +195,6 @@ class SingleMethod:
         for entry in self.logs:
             url = entry['request']['url']
 
-            # TODO: replace this looping by looping every entry through parameter objects should be cleaner
-            # doing that removes need of usage of param analysis
-
-
-            #for param in analysis_requests:
             for param in self.parameters:
 
                 # TODO: Works only with one path parameter
@@ -494,8 +486,7 @@ class Parameter:
 
 
 class ASC:
-    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0,
-                 crash_in_coverage_failure=True):
+    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
 
@@ -507,16 +498,14 @@ class ASC:
         self.endpoints = {}
         self.basepath = ""
 
-        self.crash_in_coverage_failure = crash_in_coverage_failure
-
         self.version = ""
 
-        # TODO: add "crash if failures noted parameter" for jenkins
+        self.endpoints_excluded = endpoints_excluded
 
-        # TODO: fix this parameter setting to be sensible, currently not working if give nothing
-        #self.endpoints_excluded = endpoints_excluded
-        self.endpoints_excluded = []
         self.coverage_level_required = coverage_level_required
+
+        # Set passing of coverage initially true
+        self.coverage_requirement_passed = True
 
     def read_har_file(self):
         # Initialize har parser object
@@ -599,7 +588,11 @@ class ASC:
         for endpoint in self.endpoints.keys():
             self.endpoints[endpoint].analyze_endpoint()
 
-    def print_analysis_to_console(self):
+    def print_analysis_to_console(self, suppressed=False):
+        # Print full analysis to console if it is not suppressed
+        if suppressed:
+            return
+
         # Export results to command line
         for endpoint in self.endpoints.keys():
             self.endpoints[endpoint].print_endpoint_analysis_to_console()
@@ -681,6 +674,8 @@ class ASC:
 
         coverage_level_achieved, failures = self.analyze_coverage()
 
+        self.coverage_requirement_passed = coverage_level_achieved
+
         # TODO: Actual schema instead of simple text file or stuff?
 
         with open(failure_report_filename, 'w') as file:
@@ -691,9 +686,14 @@ class ASC:
         # TODO: Luodaan ihmisluettava iso rapsa, ei vaikutuksia ajomoodeilla, kaikki anomaliat ja vähäisetkin virheet mukaan
         pass
 
-    def crash_program(self):
-        # Crash program if needed
-        pass
+    def crash_program(self, suppress_crash=False):
+        # Crash program with exit code 1 if needed and not suppressed
+        if suppress_crash:
+            return
+
+        if not self.coverage_requirement_passed:
+            # Crash program
+            exit(1)
 
 def main():
     parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
@@ -701,12 +701,12 @@ def main():
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
     parser.add_argument('failurereportname', nargs="?", type=str, default="failure_report.txt")
     parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 100% cov expected always. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
-    parser.add_argument('--exclude', nargs='+', type=str, help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
-    parser.add_argument('--suppressconsole', help="Suppress console outputs, default false")
-    parser.add_argument('--dontcrashincoveragefailure', help="Do not crash program in the end if coverage level is not fullfilled")
+    parser.add_argument('--exclude', nargs='+', type=str, default=[], help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
+    parser.add_argument('--suppressconsole', help="Suppress console outputs", action='store_true')
+    parser.add_argument('--dontcrashincoveragefailure', action='store_true', help="Do not crash program in the end if coverage level is not fullfilled")
 
-    # TODO: Add suppression of console output arguments (so report not outputted to command line, default is yes console output)
     args = parser.parse_args()
+
 
     asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude)
 
@@ -714,10 +714,9 @@ def main():
     asc.read_har_file()
     asc.preprocess_har_entries()
     asc.analyze()
-    asc.print_analysis_to_console()
+    asc.print_analysis_to_console(suppressed=args.suppressconsole)
     asc.export_failure_report(args.failurereportname)
-    #asc.analyze_coverage()
-    asc.crash_program()
+    asc.crash_program(suppress_crash=args.dontcrashincoveragefailure)
 
 
 # TODO: Move both functions to utils
