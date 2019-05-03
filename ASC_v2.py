@@ -8,6 +8,8 @@ from jsonschema import validators
 
 from urllib.parse import urlparse
 
+from enum import Enum
+
 from time import time
 
 from prance import ResolvingParser
@@ -34,7 +36,7 @@ class Endpoint:
         method_type = entry['request']['method'].lower()
         self.methods[method_type].add_entry(entry)
 
-    def match_url_to_path(self, url, basepath=""):
+    def match_url_to_path(self, url):
         '''
         Just determines if url matches this endpoints path
         :param url:
@@ -43,9 +45,10 @@ class Endpoint:
         '''
 
         url_parsed = urlparse(url)
+        # TODO: do some testing to ensure working with 2 or more path parameters
 
+        # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
-            # TODO: Consider if basepath parameter is needed at all
             # Create search pattern by replacing path parameter with 'anything-but-slash' wildcard
             search_pattern = re.sub('{.+}', '[^/]+', self.path) + "$"
 
@@ -105,7 +108,6 @@ class SingleMethod:
         self.path = path
         self.response_schemas = "" #will this be futile?
         self.parameters = parameters # array of parameter objects
-        print(self.parameters)
         self.methodinfo = methodinfo
 
         # Array of entries
@@ -197,19 +199,39 @@ class SingleMethod:
 
             for param in self.parameters:
 
-                # TODO: Works only with one path parameter
+                # TODO: Should be usable with multiple path params now, but needs testing
+
+                # TODO: How should lack of required parameter treated? It can be intentional in test and should not crash anything?
                 if param.location == 'path':
                 #if param['in'] == 'path':
-                    # TODO: can param name used as checker where stuff is placed?
-                    if '{' in self.path and '}' in self.path:
-                        # Seek parameter value and handle it default way
-                        #prepart = self.path.split('{' + param['name'] + '}')[0]
-                        prepart = self.path.split('{' + param.name + '}')[0]
-                        paramvalue = re.search(prepart + '(.*)([^/]|$|[?])', url).group(1)
+                    # turha if lause?
+                    #if '{' in self.path and '}' in self.path:
 
-                        #param['analysis']['values'].append(paramvalue)
-                        #param['analysis']['count'] += 1
-                        param.addUsage(paramvalue)
+
+                    path_prepart = self.path.split('{' + param.name + '}')[0]
+
+                    # Replace path parameters in prepath with no-slash wildcard
+
+                    path_prepart = re.sub('{.+}', '[^/]+', path_prepart)
+
+                    # may not work, is last match needed?
+                    #paramvalue = re.search(path_prepart + '(.*)([^/]|$|[?])', url).group(0)
+                    paramvalue = re.search(path_prepart + '(?P<path_parameter_value>(.*)([^/]|$|[?]))', url).group('path_parameter_value')
+
+
+                    print(paramvalue)
+
+
+                    # Seek parameter value and handle it default way
+                    #prepart = self.path.split('{' + param['name'] + '}')[0]
+
+                    #old ones
+                    #prepart = self.path.split('{' + param.name + '}')[0]
+                    #paramvalue = re.search(prepart + '(.*)([^/]|$|[?])', url).group(1)
+
+                    #param['analysis']['values'].append(paramvalue)
+                    #param['analysis']['count'] += 1
+                    param.addUsage(paramvalue)
 
                     # TODO: Make anomaly entry if parameter not found
 
@@ -469,6 +491,18 @@ class Schema:
         self.payload = ""
 
 
+class AnomalyType(Enum):
+    UNKNOWN_RESPONSE_CODE = 1
+    MISSING_REQUIRED_REQUEST_PARAMETER = 2
+
+
+class Anomaly:
+    def __init__(self, entry, type, description):
+        self.entry = entry
+        self.type = type
+        self.description = description
+
+
 # TODO: should enum be added to location?
 class Parameter:
     def __init__(self, name, location, required=False, schema=None):
@@ -578,10 +612,15 @@ class ASC:
         for page in self.harobject.pages:
             for entry in page.entries:
                 url = entry['request']['url']
+                endpoint_found = False
                 for endpoint in self.endpoints.keys():
                     if self.endpoints[endpoint].match_url_to_path(url):
                         self.endpoints[endpoint].input_log_entry(entry)
+                        endpoint_found = True
                         break
+
+                if not endpoint_found:
+                    print(f"HAR entry URL {url} does not correspond any endpoint in API specification")
 
     def analyze(self):
         # Trigger every endppoint analysis
