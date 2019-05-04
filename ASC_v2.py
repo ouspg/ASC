@@ -406,27 +406,34 @@ class SingleMethod:
 
             # Analyzing responses
             response_code = str(entry['response']['status'])
+            response_code_found = False
+            for resp in self.responses:
+                if resp.code == response_code:
+                    response_code_found = True
+                    resp.addUsage(entry['response']['content']['text'])
 
-            if response_code in analysis_responses['responses'].keys():
-                analysis_responses['responses'][response_code]['analysis']['count'] += 1
-                analysis_responses['responses'][response_code]['analysis']['values'].append(entry['response']['content']['text'])
+            #if response_code in analysis_responses['responses'].keys():
+            #    analysis_responses['responses'][response_code]['analysis']['count'] += 1
+            #    analysis_responses['responses'][response_code]['analysis']['values'].append(entry['response']['content']['text'])
 
-                # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
-                # Now xml bodies are just skipped
+                    # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
+                    # Now xml bodies are just skipped
 
-                # If response has schema specified, compare response body content with it
-                if 'schema' in analysis_responses['responses'][response_code]:
-                    sch = json.loads(json.dumps(analysis_responses['responses'][response_code]['schema']))
+                    # If response has schema specified, compare response body content with it
+                    if 'schema' in analysis_responses['responses'][response_code]:
+                        sch = json.loads(json.dumps(analysis_responses['responses'][response_code]['schema']))
 
-                    # Try parse and validate
-                    try:
-                        ins = json.loads(entry['response']['content']['text'])
-                        validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                    except Exception as e:
-                        print(str(e))
-                        # TODO: Make exception add anomaly
+                        # Try parse and validate
+                        try:
+                            ins = json.loads(entry['response']['content']['text'])
+                            validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
+                        except Exception as e:
+                            print(str(e))
+                            # TODO: Make exception add anomaly
+                    break
 
-            else:
+            # TODO: Default responses not yet calculated correctly
+            if not response_code_found:
                 # Undefined response code detected
                 # Decide if default response is present and make anomaly text based on it
 
@@ -436,6 +443,7 @@ class SingleMethod:
                     #anomaly['reason'] += ". NOTICE: Specification has default response specified"
                     analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
                                                                "Response code " + str(response_code) + " is not explictly defined in API specification, but default response is present"))
+
                 else:
                     analysis['anomaly_entries'].append(
                         Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
@@ -486,21 +494,24 @@ class SingleMethod:
         print('')
         print("Responses occurred:")
 
-        for response_code, content in self.analysis_result['responses_info']['responses'].items():
-
-            if response_code == 'default':
+        for response in self.responses:
+        #for response_code, content in self.analysis_result['responses_info']['responses'].items():
+            if response.code == 'default':
+            #if response_code == 'default':
                 break
 
-            response_occurrence_count = content['analysis']['count']
-            response_occurrence_count_unique = len(list(set(content['analysis']['values'])))
+            #response_occurrence_count = content['analysis']['count']
+            #response_occurrence_count = response.usage_count
+            #response_occurrence_count_unique = len(list(set(content['analysis']['values'])))
+            response_occurrence_count_unique = len(response.unique_body_values)
 
-            print("\t" + f"Response code {response_code}")
+            print("\t" + f"Response code {response.code}")
 
-            if response_occurrence_count > 0:
-                print("\t" + bcolors.OKGREEN + f"Total occurrences: {response_occurrence_count}" + bcolors.ENDC)
+            if response.usage_count > 0:
+                print("\t" + bcolors.OKGREEN + f"Total occurrences: {response.usage_count}" + bcolors.ENDC)
                 print("\t" + "\t" + f"Unique valued response content occurrences: {response_occurrence_count_unique}")
             else:
-                print("\t" + bcolors.FAIL + f"Total occurrences: {response_occurrence_count}" + bcolors.ENDC)
+                print("\t" + bcolors.FAIL + f"Total occurrences: {response.usage_count}" + bcolors.ENDC)
 
             print('')
 
@@ -559,6 +570,11 @@ class Response:
         self.schema = schema # not yet used
         self.usage_count = 0
         self.unique_body_values = set()
+
+    def addUsage(self, value):
+        # Increase counter and add value if uniq
+        self.usage_count = self.usage_count + 1
+        self.unique_body_values.add(value)
 
 class ASC:
     def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0):
