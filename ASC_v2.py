@@ -103,12 +103,14 @@ class Endpoint:
 
 # Class for single method
 class SingleMethod:
-    def __init__(self, type, path, methodinfo, parameters):
+    def __init__(self, type, path, methodinfo, parameters, responses):
         self.type = type # type or method?
         self.path = path
         self.response_schemas = "" #will this be futile?
         self.parameters = parameters # array of parameter objects
         self.methodinfo = methodinfo
+
+        self.responses = responses
 
         # Array of entries
         self.logs = []
@@ -156,14 +158,16 @@ class SingleMethod:
         analysis_requestbody = None
 
         #print(self.methodinfo)
+        analysis_requests = []
         if 'parameters' in self.methodinfo.keys():
-            analysis_requests = self.methodinfo['parameters']
-            print(analysis_requests)
+            #analysis_requests = self.methodinfo['parameters']
+            #print(analysis_requests)
+            pass
         else:
             #looking for requestbody
             #set up termporary empty parameters
 
-            analysis_requests = []
+            #analysis_requests = []
             #analysis_requestbodies = []
             if 'requestBody' in self.methodinfo.keys():
                 analysis_requestbody = self.methodinfo['requestBody']
@@ -172,16 +176,19 @@ class SingleMethod:
                     'count': 0
                 }
             # for v3
+        '''
+        '''
 
 
         # Should be working with api spec 3 too now
 
-        for param in analysis_requests:
+        # Not used anymore?
+        #for param in analysis_requests:
 
-            param['analysis'] = {
-                'values': [],
-                'count': 0
-            }
+        #    param['analysis'] = {
+        #        'values': [],
+        #        'count': 0
+        #    }
 
         analysis_responses = {
             'responses': self.methodinfo['responses']
@@ -255,13 +262,19 @@ class SingleMethod:
                     #if param['required'] and not parameter_found:
                     if param.required and not parameter_found:
                         # Anomaly because of required parameter is not found
+                        '''
                         anomaly = {
                             "entry": entry,
                             "reason": "Required parameter " + str(
                                 param['name']) + " was not found in request query parameters"
                         }
-
-                        analysis['anomaly_entries'].append(anomaly)
+                        '''
+                        #analysis['anomaly_entries'].append(anomaly)
+                        analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                                               "Required parameter " + str(
+                                                                   param[
+                                                                       'name']) + " was not found in request query parameters"
+                                                               ))
 
                 #elif param['in'] == 'header':
                 elif param.location == 'header':
@@ -280,6 +293,7 @@ class SingleMethod:
                     #if param['required'] and not parameter_found:
                     if param.required and not parameter_found:
                         # Anomaly because of required parameter is not found
+                        '''
                         anomaly = {
                             "entry": entry,
                             "reason": "Required parameter " + str(
@@ -287,6 +301,13 @@ class SingleMethod:
                         }
 
                         analysis['anomaly_entries'].append(anomaly)
+                        '''
+                        analysis['anomaly_entries'].append(
+                            Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                    "Required parameter " + str(
+                                        param[
+                                            'name']) + " was not found in request header parameters"
+                                    ))
 
                 #elif param['in'] == 'body':
                 elif param.location == 'body':
@@ -308,12 +329,14 @@ class SingleMethod:
                         print("Cannot parse request parameters")
 
                         # Add anomaly
-                        anomaly = {
-                            "entry": entry,
-                            "reason": "Could not parse sended data object in body to json object"
-                        }
+                        #anomaly = {
+                        #    "entry": entry,
+                        #    "reason": "Could not parse sended data object in body to json object"
+                        #}
 
-                        analysis['anomaly_entries'].append(anomaly)
+                        #analysis['anomaly_entries'].append(anomaly)
+                        analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
+                                                                   "Could not parse sended data object in body to json object"))
 
                     else:
                         try:
@@ -322,12 +345,15 @@ class SingleMethod:
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except:
                             # Add entry to anomalities
-                            anomaly = {
-                                "entry": entry,
-                                "reason": "Validator produced error when validating this request body"
-                            }
+                            #anomaly = {
+                            #    "entry": entry,
+                            #    "reason": "Validator produced error when validating this request body"
+                            #}
 
-                            analysis['anomaly_entries'].append(anomaly)
+                            #analysis['anomaly_entries'].append(anomaly)
+
+                            analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
+                                                                       "Validator produced error when validating this request body"))
 
                     pass
                 #elif param['in'] == 'formData':
@@ -403,15 +429,19 @@ class SingleMethod:
             else:
                 # Undefined response code detected
                 # Decide if default response is present and make anomaly text based on it
-                anomaly = {
-                    "entry": entry,
-                    "reason": "Response code " + str(response_code) + " is not explictly defined in API specification"
-                }
+
+                # TODO: Should default response content and stuff be inspected?
 
                 if 'default' in analysis_responses['responses'].keys():
-                    anomaly['reason'] += ". NOTICE: Specification has default response specified"
+                    #anomaly['reason'] += ". NOTICE: Specification has default response specified"
+                    analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
+                                                               "Response code " + str(response_code) + " is not explictly defined in API specification, but default response is present"))
+                else:
+                    analysis['anomaly_entries'].append(
+                        Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
+                                "Response code " + str(
+                                    response_code) + " is not explictly defined in API specification, and default response is not present"))
 
-                analysis['anomaly_entries'].append(anomaly)
 
         analysis['request_info'] = analysis_requests
         analysis['responses_info'] = analysis_responses
@@ -479,8 +509,10 @@ class SingleMethod:
             print(f"Anomaly entries in traffic: {len(self.analysis_result['anomaly_entries'])}")
             for anomaly_entry in self.analysis_result['anomaly_entries']:
 
-                print("\t" + f"Anomaly description: {anomaly_entry['reason']}")
-                print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry['entry']}")
+                #print("\t" + f"Anomaly description: {anomaly_entry['reason']}")
+                #print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry['entry']}")
+                print("\t" + f"Anomaly description: {anomaly_entry.description}")
+                print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry.entry}")
 
 
 class Schema:
@@ -492,8 +524,10 @@ class Schema:
 
 
 class AnomalyType(Enum):
-    UNKNOWN_RESPONSE_CODE = 1
+    UNDEFINED_RESPONSE_CODE_DEFAULT_NOT_SPECIFIED = 1
     MISSING_REQUIRED_REQUEST_PARAMETER = 2
+    BROKEN_REQUEST_BODY = 3
+    UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED = 4
 
 
 class Anomaly:
@@ -518,6 +552,13 @@ class Parameter:
         self.usage_count = self.usage_count + 1
         self.unique_values.add(value)
 
+
+class Response:
+    def __init__(self, code, schema):
+        self.code = code
+        self.schema = schema # not yet used
+        self.usage_count = 0
+        self.unique_body_values = set()
 
 class ASC:
     def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0):
@@ -577,10 +618,19 @@ class ASC:
                 # Operation params can override endpoint params
                 params_operation = []
 
+                # TODO: Need tho think if common responses affect these
+                responses_operation = []
+
                 if 'parameters' in paths[endpoint][method].keys():
                     # Common parameters for endpoint exists
                     for param in paths[endpoint][method]['parameters']:
                         params_operation.append(Parameter(param['name'], param['in']))
+
+                # Responses
+                #print(paths[endpoint][method]['responses'])
+                for code in paths[endpoint][method]['responses'].keys():
+                    # TODO: Make some use of the schema
+                    responses_operation.append(Response(code, ""))
 
                 # OpenAPI v3 has requestbody field instead of form and body parameters
                 if 'requestBody' in paths[endpoint][method].keys():
@@ -602,7 +652,7 @@ class ASC:
                 params_final.extend(params_operation)
 
                 minfo = copy.deepcopy(paths[endpoint][method])
-                mthds[method] = SingleMethod(method, endpoint, minfo, params_final)
+                mthds[method] = SingleMethod(method, endpoint, minfo, params_final, responses_operation)
             self.endpoints[endpoint] = (Endpoint(endpoint, mthds))
 
     def preprocess_har_entries(self):
