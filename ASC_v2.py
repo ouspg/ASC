@@ -10,14 +10,12 @@ from urllib.parse import urlparse
 
 from enum import Enum
 
-from time import time
-
 from prance import ResolvingParser
 
 # Colors from here https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
 
 
-class bcolors:
+class TerminalColors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -34,6 +32,8 @@ class Endpoint:
     def input_log_entry(self, entry):
         # Input entry under correct method
         method_type = entry['request']['method'].lower()
+
+        # TODO: check if exists
         self.methods[method_type].add_entry(entry)
 
     def match_url_to_path(self, url):
@@ -52,12 +52,8 @@ class Endpoint:
             # Create search pattern by replacing path parameter with 'anything-but-slash' wildcard
             search_pattern = re.sub('{.+}', '[^/]+', self.path) + "$"
 
-            #print(search_pattern)
-            #print(url_parsed.path)
-
             # Check if path matches to url
             if re.search(search_pattern, url_parsed.path):
-                #print("FOUND________________")
                 return True
 
             pass
@@ -74,7 +70,7 @@ class Endpoint:
     def print_endpoint_analysis_to_console(self):
         # Print analysis
         for mtd in self.methods.keys():
-            print(bcolors.HEADER + f"Endpoint {self.path} - method {mtd}" + bcolors.ENDC)
+            print(TerminalColors.HEADER + f"Endpoint {self.path} - method {mtd}" + TerminalColors.ENDC)
             self.methods[mtd].print_method_analysis_to_console()
             print('')
             print('')
@@ -104,10 +100,9 @@ class Endpoint:
 # Class for single method
 class SingleMethod:
     def __init__(self, type, path, methodinfo, parameters, responses):
-        self.type = type # type or method?
+        self.type = type
         self.path = path
-        self.response_schemas = "" #will this be futile?
-        self.parameters = parameters # array of parameter objects
+        self.parameters = parameters
         self.methodinfo = methodinfo
 
         self.responses = responses
@@ -115,7 +110,10 @@ class SingleMethod:
         # Array of entries
         self.logs = []
 
-        self.analysis_result = ""
+        # Array of anomalies, filled during analysis
+        self.anomalies = []
+
+        self.analysis_result = "" # Starts to be futile?
 
     def add_entry(self, entry):
         # Add single entry to list
@@ -132,63 +130,39 @@ class SingleMethod:
         # return array of responses not used
         # returns as list, receiver checks if empty
         # how to handle default response stuff?
+        # koska res
         response_not_used = []
-        for response in self.analysis_result["responses_info"]['responses'].keys():
-            if self.analysis_result["responses_info"]['responses'][response]['analysis']['count'] == 0:
-                response_not_used.append(response)
+
+        for response in self.responses:
+            if (response.code != 'default') and (response.usage_count == 0):
+                response_not_used.append(response.code)
+
         return response_not_used
 
     def analyze(self):
         # Run analysis for this method and store all analysis for later inspections
 
-        # TODO: Looks like operationid is not used, might be needed better structures and everything here too
+        # TODO: might be needed better structures and everything here too
         analysis = {
-            'method': self.type,
-            'operationId': "",
-            'request_info': "",
             'request_info_requestbody': "",
-            'responses_info': "",
-            'anomaly_entries': [],
-            'total_count': 0
+            'responses_info': ""
         }
 
-        # Get total count
-        analysis['total_count'] = len(self.logs)
+        # Get total count, now futile
+        #analysis['total_count'] = len(self.logs)
 
         analysis_requestbody = None
 
-        #print(self.methodinfo)
-        analysis_requests = []
-        if 'parameters' in self.methodinfo.keys():
-            #analysis_requests = self.methodinfo['parameters']
-            #print(analysis_requests)
-            pass
-        else:
-            #looking for requestbody
-            #set up termporary empty parameters
 
-            #analysis_requests = []
-            #analysis_requestbodies = []
-            if 'requestBody' in self.methodinfo.keys():
-                analysis_requestbody = self.methodinfo['requestBody']
-                analysis_requestbody['analysis'] = {
-                    'values': [],
-                    'count': 0
-                }
+        if 'requestBody' in self.methodinfo.keys():
+            analysis_requestbody = self.methodinfo['requestBody']
+            analysis_requestbody['analysis'] = {
+                'values': [],
+                'count': 0
+            }
             # for v3
-        '''
-        '''
-
 
         # Should be working with api spec 3 too now
-
-        # Not used anymore?
-        #for param in analysis_requests:
-
-        #    param['analysis'] = {
-        #        'values': [],
-        #        'count': 0
-        #    }
 
         analysis_responses = {
             'responses': self.methodinfo['responses']
@@ -205,39 +179,20 @@ class SingleMethod:
             url = entry['request']['url']
 
             for param in self.parameters:
-
                 # TODO: Should be usable with multiple path params now, but needs testing
 
                 # TODO: How should lack of required parameter treated? It can be intentional in test and should not crash anything?
                 if param.location == 'path':
-                #if param['in'] == 'path':
-                    # turha if lause?
-                    #if '{' in self.path and '}' in self.path:
-
-
                     path_prepart = self.path.split('{' + param.name + '}')[0]
 
                     # Replace path parameters in prepath with no-slash wildcard
 
                     path_prepart = re.sub('{.+}', '[^/]+', path_prepart)
 
-                    # may not work, is last match needed?
-                    #paramvalue = re.search(path_prepart + '(.*)([^/]|$|[?])', url).group(0)
+                    # TODO: Testing needed
                     paramvalue = re.search(path_prepart + '(?P<path_parameter_value>(.*)([^/]|$|[?]))', url).group('path_parameter_value')
 
 
-                    print(paramvalue)
-
-
-                    # Seek parameter value and handle it default way
-                    #prepart = self.path.split('{' + param['name'] + '}')[0]
-
-                    #old ones
-                    #prepart = self.path.split('{' + param.name + '}')[0]
-                    #paramvalue = re.search(prepart + '(.*)([^/]|$|[?])', url).group(1)
-
-                    #param['analysis']['values'].append(paramvalue)
-                    #param['analysis']['count'] += 1
                     param.addUsage(paramvalue)
 
                     # TODO: Make anomaly entry if parameter not found
@@ -252,57 +207,31 @@ class SingleMethod:
                         #if queryparameter['name'] == param['name']:
                         if queryparameter['name'] == param.name:
                             paramvalue = queryparameter['value']
-                            #param['analysis']['values'].append(paramvalue)
-                            #param['analysis']['count'] += 1
                             param.addUsage(paramvalue)
                             parameter_found = True
 
                     # Add anomaly if required parameter does not exist
-
-                    #if param['required'] and not parameter_found:
                     if param.required and not parameter_found:
                         # Anomaly because of required parameter is not found
-                        '''
-                        anomaly = {
-                            "entry": entry,
-                            "reason": "Required parameter " + str(
-                                param['name']) + " was not found in request query parameters"
-                        }
-                        '''
-                        #analysis['anomaly_entries'].append(anomaly)
-                        analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                        self.anomalies.append(Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
                                                                "Required parameter " + str(
                                                                    param[
                                                                        'name']) + " was not found in request query parameters"
-                                                               ))
+                                                      ))
 
-                #elif param['in'] == 'header':
                 elif param.location == 'header':
                     # Check request header parameters as default way
                     parameter_found = False
 
                     for headerparameter in entry['request']['headers']:
-                        #if headerparameter['name'] == param['name']:
                         if headerparameter['name'] == param.name:
                             paramvalue = headerparameter['value']
-                            #param['analysis']['values'].append(paramvalue)
-                            #param['analysis']['count'] += 1
                             param.addUsage(paramvalue)
 
                     # Add anomaly because request header parameter is not found
-                    #if param['required'] and not parameter_found:
                     if param.required and not parameter_found:
                         # Anomaly because of required parameter is not found
-                        '''
-                        anomaly = {
-                            "entry": entry,
-                            "reason": "Required parameter " + str(
-                                param['name']) + " was not found in request header parameters"
-                        }
-
-                        analysis['anomaly_entries'].append(anomaly)
-                        '''
-                        analysis['anomaly_entries'].append(
+                        self.anomalies.append(
                             Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
                                     "Required parameter " + str(
                                         param[
@@ -316,8 +245,6 @@ class SingleMethod:
                     # Checks if request body json is broken
 
                     paramvalue = entry['request']['postData']['text']
-                    #param['analysis']['values'].append(paramvalue)
-                    #param['analysis']['count'] += 1
                     param.addUsage(paramvalue)
 
                     # TODO: Possibly new feature to check and handle single schema fields as parameters if needed
@@ -329,13 +256,7 @@ class SingleMethod:
                         print("Cannot parse request parameters")
 
                         # Add anomaly
-                        #anomaly = {
-                        #    "entry": entry,
-                        #    "reason": "Could not parse sended data object in body to json object"
-                        #}
-
-                        #analysis['anomaly_entries'].append(anomaly)
-                        analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
+                        self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
                                                                    "Could not parse sended data object in body to json object"))
 
                     else:
@@ -344,15 +265,7 @@ class SingleMethod:
 
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except:
-                            # Add entry to anomalities
-                            #anomaly = {
-                            #    "entry": entry,
-                            #    "reason": "Validator produced error when validating this request body"
-                            #}
-
-                            #analysis['anomaly_entries'].append(anomaly)
-
-                            analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
+                            self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
                                                                        "Validator produced error when validating this request body"))
 
                     pass
@@ -365,8 +278,6 @@ class SingleMethod:
                             #if formparam['name'] == param['name']:
                             if formparam['name'] == param.name:
                                 paramvalue = formparam['value']
-                                #param['analysis']['values'].append(paramvalue)
-                                #param['analysis']['count'] += 1
                                 param.addUsage(paramvalue)
 
                             # TODO: Detect if parameter has some anomality or not corresponding API spec
@@ -377,20 +288,13 @@ class SingleMethod:
                         parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
 
                         for p_name, paramvalue in parseddata:
-                            #if p_name == param['name']:
                             if p_name == param.name:
-                                #param['analysis']['values'].append(paramvalue)
-                                #param['analysis']['count'] += 1
                                 param.addUsage(paramvalue)
 
                             # TODO: Detect if parameter has some anomality or not corresponding API spec
 
             # Analyze entry from the viewpoint of requestbodyparameter (OA v3) if it exists
             if analysis_requestbody != None:
-                #flow
-                #check if postdata have params or text field (same as upper formData stuff)
-                #just get uniqueness and validate schema, no more for now
-                #should it just add more params to the list aka parse schema and just make new set of params
                 if 'params' in entry['request']['postData']:
                     # Is this futile?
                     print("params values")
@@ -412,24 +316,23 @@ class SingleMethod:
                     response_code_found = True
                     resp.addUsage(entry['response']['content']['text'])
 
-            #if response_code in analysis_responses['responses'].keys():
-            #    analysis_responses['responses'][response_code]['analysis']['count'] += 1
-            #    analysis_responses['responses'][response_code]['analysis']['values'].append(entry['response']['content']['text'])
-
                     # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
                     # Now xml bodies are just skipped
 
                     # If response has schema specified, compare response body content with it
-                    if 'schema' in analysis_responses['responses'][response_code]:
-                        sch = json.loads(json.dumps(analysis_responses['responses'][response_code]['schema']))
 
+                    # Transfer this to correspond new objects
+                    if resp.schema is not None:
+                    #if 'schema' in analysis_responses['responses'][response_code]:
+                        #sch = json.loads(json.dumps(analysis_responses['responses'][response_code]['schema']))
+                        sch = json.loads(json.dumps(resp.schema))
                         # Try parse and validate
                         try:
                             ins = json.loads(entry['response']['content']['text'])
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except Exception as e:
                             print(str(e))
-                            # TODO: Make exception add anomaly
+                            # TODO: Make exception and add anomaly
                     break
 
             # TODO: Default responses not yet calculated correctly
@@ -440,50 +343,49 @@ class SingleMethod:
                 # TODO: Should default response content and stuff be inspected?
 
                 if 'default' in analysis_responses['responses'].keys():
-                    #anomaly['reason'] += ". NOTICE: Specification has default response specified"
-                    analysis['anomaly_entries'].append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
+                    self.anomalies.append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
                                                                "Response code " + str(response_code) + " is not explictly defined in API specification, but default response is present"))
 
                 else:
-                    analysis['anomaly_entries'].append(
+                    self.anomalies.append(
                         Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
                                 "Response code " + str(
                                     response_code) + " is not explictly defined in API specification, and default response is not present"))
 
-
-        analysis['request_info'] = analysis_requests
+        # Request info never used anywhere and neither analysis requests
+        #analysis['request_info'] = analysis_requests
         analysis['responses_info'] = analysis_responses
 
         self.analysis_result = analysis
 
     def print_method_analysis_to_console(self):
         # Just prints analysis fancy way
-        if self.analysis_result['total_count'] == 0:
-            print("\t" + bcolors.FAIL + f"Total number of request/responses: {self.analysis_result['total_count']}" + bcolors.ENDC)
+
+        total_count = len(self.logs)
+
+        if total_count == 0:
+        #if self.analysis_result['total_count'] == 0:
+            #print("\t" + TerminalColors.FAIL + f"Total number of request/responses: {self.analysis_result['total_count']}" + TerminalColors.ENDC)
+            print("\t" + TerminalColors.FAIL + f"Total number of request/responses: {total_count}" + TerminalColors.ENDC)
+
             return
         else:
-            print("\t" + bcolors.OKGREEN +f"Total number of request/responses: {self.analysis_result['total_count']}" + bcolors.ENDC)
+            #print("\t" + TerminalColors.OKGREEN + f"Total number of request/responses: {self.analysis_result['total_count']}" + TerminalColors.ENDC)
+            print("\t" + TerminalColors.OKGREEN + f"Total number of request/responses: {total_count}" + TerminalColors.ENDC)
 
         print('')
         print("Parameters occurred in requests:")
 
-
-        # Rewriting params analysis code because of new class
-        #for param in self.analysis_result['request_info']:
+        # Analyzing stored parameters
         for param in self.parameters:
-            #param_occurrence_count = param['analysis']["count"]
 
-            # Does not preserve order
-            #param_occurrence_count_unique = len(list(set(param['analysis']["values"])))
+            # Unique count from set (set is always uniq)
             param_occurrence_count_unique = len(param.unique_values)
 
-            #if param_occurrence_count == 0:
             if param.usage_count == 0:
-                #print("\t" + bcolors.FAIL + f"Parameter named {param['name']} never occurred" + bcolors.ENDC)
-                print("\t" + bcolors.FAIL + f"Parameter named {param.name} never occurred" + bcolors.ENDC)
+                print("\t" + TerminalColors.FAIL + f"Parameter named {param.name} never occurred" + TerminalColors.ENDC)
             else:
-                #print("\t" + bcolors.OKGREEN + f"Parameter named {param['name']}  occurred {param_occurrence_count} time(s)" + bcolors.ENDC)
-                print("\t" + bcolors.OKGREEN + f"Parameter named {param.name}  occurred {param.usage_count} time(s)" + bcolors.ENDC)
+                print("\t" + TerminalColors.OKGREEN + f"Parameter named {param.name}  occurred {param.usage_count} time(s)" + TerminalColors.ENDC)
 
                 print("\t" + "\t" + f"Unique valued occurrences: {param_occurrence_count_unique}")
 
@@ -495,33 +397,25 @@ class SingleMethod:
         print("Responses occurred:")
 
         for response in self.responses:
-        #for response_code, content in self.analysis_result['responses_info']['responses'].items():
             if response.code == 'default':
-            #if response_code == 'default':
                 break
 
-            #response_occurrence_count = content['analysis']['count']
-            #response_occurrence_count = response.usage_count
-            #response_occurrence_count_unique = len(list(set(content['analysis']['values'])))
             response_occurrence_count_unique = len(response.unique_body_values)
 
             print("\t" + f"Response code {response.code}")
 
             if response.usage_count > 0:
-                print("\t" + bcolors.OKGREEN + f"Total occurrences: {response.usage_count}" + bcolors.ENDC)
+                print("\t" + TerminalColors.OKGREEN + f"Total occurrences: {response.usage_count}" + TerminalColors.ENDC)
                 print("\t" + "\t" + f"Unique valued response content occurrences: {response_occurrence_count_unique}")
             else:
-                print("\t" + bcolors.FAIL + f"Total occurrences: {response.usage_count}" + bcolors.ENDC)
+                print("\t" + TerminalColors.FAIL + f"Total occurrences: {response.usage_count}" + TerminalColors.ENDC)
 
             print('')
 
         print('')
-        if len(self.analysis_result['anomaly_entries']) > 0:
-            print(f"Anomaly entries in traffic: {len(self.analysis_result['anomaly_entries'])}")
-            for anomaly_entry in self.analysis_result['anomaly_entries']:
-
-                #print("\t" + f"Anomaly description: {anomaly_entry['reason']}")
-                #print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry['entry']}")
+        if len(self.anomalies) > 0:
+            print(f"Anomaly entries in traffic: {len(self.anomalies)}")
+            for anomaly_entry in self.anomalies:
                 print("\t" + f"Anomaly description: {anomaly_entry.description}")
                 print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry.entry}")
 
@@ -567,7 +461,8 @@ class Parameter:
 class Response:
     def __init__(self, code, schema):
         self.code = code
-        self.schema = schema # not yet used
+        # Should multiple schemas be available because those exist in api specs too?
+        self.schema = schema
         self.usage_count = 0
         self.unique_body_values = set()
 
@@ -609,8 +504,6 @@ class ASC:
         # NOTICE: OA v2 seems to be working fine with openapi spec validator and swagger validator too
 
         specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
-        #print(specparser.specification)
-
 
         # TODO: filter all allowed versions here and if spec is not supported then print error
         self.version = specparser.version
@@ -643,10 +536,20 @@ class ASC:
                         params_operation.append(Parameter(param['name'], param['in']))
 
                 # Responses
-                #print(paths[endpoint][method]['responses'])
                 for code in paths[endpoint][method]['responses'].keys():
-                    # TODO: Make some use of the schema
-                    responses_operation.append(Response(code, ""))
+                    # Get schema if it exists
+                    schema = None
+                    if 'schema' in paths[endpoint][method]['responses'][code].keys():
+                        # Openapi V2
+                        schema = paths[endpoint][method]['responses'][code]['schema']
+
+                    elif 'content' in paths[endpoint][method]['responses'][code].keys():
+                        # Openapi v3
+                        if 'schema' in paths[endpoint][method]['responses'][code]['content'].keys():
+                            # TODO: Determine what to do because multiple schemas for xml/json can be in spec
+                            pass
+
+                    responses_operation.append(Response(code, schema))
 
                 # OpenAPI v3 has requestbody field instead of form and body parameters
                 if 'requestBody' in paths[endpoint][method].keys():
