@@ -128,9 +128,7 @@ class SingleMethod:
 
     def get_responses_not_used(self):
         # return array of responses not used
-        # returns as list, receiver checks if empty
-        # how to handle default response stuff?
-        # koska res
+
         response_not_used = []
 
         for response in self.responses:
@@ -144,15 +142,10 @@ class SingleMethod:
 
         # TODO: might be needed better structures and everything here too
         analysis = {
-            'request_info_requestbody': "",
-            'responses_info': ""
+            'request_info_requestbody': ""
         }
 
-        # Get total count, now futile
-        #analysis['total_count'] = len(self.logs)
-
         analysis_requestbody = None
-
 
         if 'requestBody' in self.methodinfo.keys():
             analysis_requestbody = self.methodinfo['requestBody']
@@ -164,47 +157,29 @@ class SingleMethod:
 
         # Should be working with api spec 3 too now
 
-        analysis_responses = {
-            'responses': self.methodinfo['responses']
-        }
-
-        for response in analysis_responses['responses']:
-            analysis_responses['responses'][response].update({'analysis': {
-                'values': [],
-                'count': 0
-            }})
-
         # Run analysis for every log entry for this endpoint method
         for entry in self.logs:
             url = entry['request']['url']
 
-            for param in self.parameters:
-                # TODO: Should be usable with multiple path params now, but needs testing
+            # TODO: How should lack of required parameter treated? It can be intentional in test and should not crash anything?
 
-                # TODO: How should lack of required parameter treated? It can be intentional in test and should not crash anything?
+            for param in self.parameters:
                 if param.location == 'path':
                     path_prepart = self.path.split('{' + param.name + '}')[0]
 
                     # Replace path parameters in prepath with no-slash wildcard
-
                     path_prepart = re.sub('{.+}', '[^/]+', path_prepart)
 
                     # TODO: Testing needed
                     paramvalue = re.search(path_prepart + '(?P<path_parameter_value>(.*)([^/]|$|[?]))', url).group('path_parameter_value')
-
-
                     param.addUsage(paramvalue)
 
-                    # TODO: Make anomaly entry if parameter not found
-
-                #elif param['in'] == 'query':
                 elif param.location == 'query':
                     # Check query parameters as default way
                     # Is query params always required?
                     parameter_found = False
 
                     for queryparameter in entry['request']['queryString']:
-                        #if queryparameter['name'] == param['name']:
                         if queryparameter['name'] == param.name:
                             paramvalue = queryparameter['value']
                             param.addUsage(paramvalue)
@@ -238,17 +213,15 @@ class SingleMethod:
                                             'name']) + " was not found in request header parameters"
                                     ))
 
-                #elif param['in'] == 'body':
                 elif param.location == 'body':
-                    # Checks body content of request
-                    # Validates request body with given schema by json schema validator
-                    # Checks if request body json is broken
-
+                    # Checks and validates body content of request and treats it as one parameter
+                    # Openapi V3 does not have body parameter and it is replaced by 'requestBody' object
                     paramvalue = entry['request']['postData']['text']
                     param.addUsage(paramvalue)
 
                     # TODO: Possibly new feature to check and handle single schema fields as parameters if needed
 
+                    # TODO: Consider making anomalies here: Those can be futile because sent data can be broken purposefully
                     try:
                         ins = json.loads(paramvalue)
                     except:
@@ -269,20 +242,21 @@ class SingleMethod:
                                                                        "Validator produced error when validating this request body"))
 
                     pass
-                #elif param['in'] == 'formData':
+
                 elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR
                     # Parsing and analyzing data from there
                     if 'params' in entry['request']['postData']:
                         for formparam in entry['request']['postData']['params']:
-                            #if formparam['name'] == param['name']:
                             if formparam['name'] == param.name:
                                 paramvalue = formparam['value']
                                 param.addUsage(paramvalue)
 
-                            # TODO: Detect if parameter has some anomality or not corresponding API spec
+                            # Data sended in parameter can be against api specification purposefully
+                            # so making anomaly out of it may be most likely irrelevant
 
                     elif 'text' in entry['request']['postData']:
+                        # Form parameters can be found in text field of HAR too, which case special parsing is required
                         # Parse multipart data from response with custom functions
                         bound = get_multipart_boundary(entry['request'])
                         parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
@@ -291,9 +265,11 @@ class SingleMethod:
                             if p_name == param.name:
                                 param.addUsage(paramvalue)
 
-                            # TODO: Detect if parameter has some anomality or not corresponding API spec
+                            # Data sended in parameter can be against api specification purposefully
+                            # so making anomaly out of it may be most likely irrelevant
 
             # Analyze entry from the viewpoint of requestbodyparameter (OA v3) if it exists
+            # TODO: Determine what to do with requestbody
             if analysis_requestbody != None:
                 if 'params' in entry['request']['postData']:
                     # Is this futile?
@@ -323,8 +299,6 @@ class SingleMethod:
 
                     # Transfer this to correspond new objects
                     if resp.schema is not None:
-                    #if 'schema' in analysis_responses['responses'][response_code]:
-                        #sch = json.loads(json.dumps(analysis_responses['responses'][response_code]['schema']))
                         sch = json.loads(json.dumps(resp.schema))
                         # Try parse and validate
                         try:
@@ -335,14 +309,22 @@ class SingleMethod:
                             # TODO: Make exception and add anomaly
                     break
 
-            # TODO: Default responses not yet calculated correctly
+
             if not response_code_found:
                 # Undefined response code detected
                 # Decide if default response is present and make anomaly text based on it
 
-                # TODO: Should default response content and stuff be inspected?
+                # TODO: Closer inspection on default schemas and stuff needed
 
-                if 'default' in analysis_responses['responses'].keys():
+                default_response_exists = False
+                for resp in self.responses:
+                    if resp.code == 'default':
+                        default_response_exists = True
+                        # Adding usage to default response
+                        resp.addUsage(entry['response']['content']['text'])
+                        break
+
+                if default_response_exists:
                     self.anomalies.append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
                                                                "Response code " + str(response_code) + " is not explictly defined in API specification, but default response is present"))
 
@@ -352,10 +334,6 @@ class SingleMethod:
                                 "Response code " + str(
                                     response_code) + " is not explictly defined in API specification, and default response is not present"))
 
-        # Request info never used anywhere and neither analysis requests
-        #analysis['request_info'] = analysis_requests
-        analysis['responses_info'] = analysis_responses
-
         self.analysis_result = analysis
 
     def print_method_analysis_to_console(self):
@@ -364,13 +342,9 @@ class SingleMethod:
         total_count = len(self.logs)
 
         if total_count == 0:
-        #if self.analysis_result['total_count'] == 0:
-            #print("\t" + TerminalColors.FAIL + f"Total number of request/responses: {self.analysis_result['total_count']}" + TerminalColors.ENDC)
             print("\t" + TerminalColors.FAIL + f"Total number of request/responses: {total_count}" + TerminalColors.ENDC)
-
             return
         else:
-            #print("\t" + TerminalColors.OKGREEN + f"Total number of request/responses: {self.analysis_result['total_count']}" + TerminalColors.ENDC)
             print("\t" + TerminalColors.OKGREEN + f"Total number of request/responses: {total_count}" + TerminalColors.ENDC)
 
         print('')
@@ -390,6 +364,7 @@ class SingleMethod:
                 print("\t" + "\t" + f"Unique valued occurrences: {param_occurrence_count_unique}")
 
         if self.analysis_result['request_info_requestbody'] != "":
+            # TODO: Rethink need of this
             print("Parameters from requestBody (OAv3)")
 
 
@@ -398,6 +373,9 @@ class SingleMethod:
 
         for response in self.responses:
             if response.code == 'default':
+                # Custom prints for default response
+                print("\t" + f"Default response")
+                print("\t\t" + f"{response.usage_count} responses which are not corresponding any other response codes")
                 break
 
             response_occurrence_count_unique = len(response.unique_body_values)
@@ -447,7 +425,7 @@ class Parameter:
     def __init__(self, name, location, required=False, schema=None):
         self.name = name
         self.location = location #Possibly enum? (header path query formdata body cookie, should make own requestbody?)
-        self.required = required #Boolean, tämäkin vähän turha
+        self.required = required #Boolean, tämäkin vähän turha, oletetaan etääm itä vaan roskaa voi tulla
         self.schema = schema #Schema json, ei pakollinen vielä
         self.usage_count = 0
         self.unique_values = set()
@@ -468,6 +446,7 @@ class Response:
 
     def addUsage(self, value):
         # Increase counter and add value if uniq
+        # Should also default response be noted?
         self.usage_count = self.usage_count + 1
         self.unique_body_values.add(value)
 
@@ -519,6 +498,7 @@ class ASC:
             if 'parameters' in paths[endpoint].keys():
                 # Common parameters for endpoint exists
                 for param in paths[endpoint]['parameters']:
+                    # TODO: Add check if param is required
                     params_endpoint.append(Parameter(param['name'], param['in']))
 
             mthds = {}
@@ -533,6 +513,7 @@ class ASC:
                 if 'parameters' in paths[endpoint][method].keys():
                     # Common parameters for endpoint exists
                     for param in paths[endpoint][method]['parameters']:
+                        # TODO: Add check if param is required
                         params_operation.append(Parameter(param['name'], param['in']))
 
                 # Responses
