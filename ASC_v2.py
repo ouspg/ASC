@@ -364,7 +364,7 @@ class SingleMethod:
                 print("\t" + "\t" + f"Unique valued occurrences: {param_occurrence_count_unique}")
 
         if self.analysis_result['request_info_requestbody'] != "":
-            # TODO: Rethink need of this
+            # TODO: Rethink need of this and make another way of registertin parameters of requestbody
             print("Parameters from requestBody (OAv3)")
 
 
@@ -411,6 +411,8 @@ class AnomalyType(Enum):
     MISSING_REQUIRED_REQUEST_PARAMETER = 2
     BROKEN_REQUEST_BODY = 3
     UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED = 4
+    BROKEN_RESPONSE_BODY = 5
+    DEFAULT_RESPONSE_IS_NOT_USED = 6 # Is this error at all?
 
 
 class Anomaly:
@@ -421,12 +423,13 @@ class Anomaly:
 
 
 # TODO: should enum be added to location?
+# Should this be handling also requestbody?
 class Parameter:
     def __init__(self, name, location, required=False, schema=None):
         self.name = name
-        self.location = location #Possibly enum? (header path query formdata body cookie, should make own requestbody?)
-        self.required = required #Boolean, tämäkin vähän turha, oletetaan etääm itä vaan roskaa voi tulla
-        self.schema = schema #Schema json, ei pakollinen vielä
+        self.location = location # path, query, body, formdata etc, should enum be made?
+        self.required = required #Boolean, not yet used, could be futile because cannot know if request omits it purposefully
+        self.schema = schema #Schema, not yet used
         self.usage_count = 0
         self.unique_values = set()
 
@@ -449,6 +452,7 @@ class Response:
         # Should also default response be noted?
         self.usage_count = self.usage_count + 1
         self.unique_body_values.add(value)
+
 
 class ASC:
     def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0):
@@ -484,7 +488,7 @@ class ASC:
 
         specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
 
-        # TODO: filter all allowed versions here and if spec is not supported then print error
+        # TODO: Check if api is allowed version(s) and then proceed or crash
         self.version = specparser.version
 
         self.apispec = specparser.specification
@@ -538,7 +542,6 @@ class ASC:
                     # TODO: consider how to apply schemas in this and think requestbody things
                     params_operation.append(Parameter('requestBody', 'requestbody'))
 
-
                 # Add here only params which are not duplicate (overriden endpoint params are dropped)
                 params_final = []
 
@@ -546,7 +549,6 @@ class ASC:
                 for p_e in params_endpoint:
                     if not any(p_o.name == p_e for p_o in params_operation):
                         params_final.append(p_e)
-
 
                 # Add all operation parameters to final array
                 params_final.extend(params_operation)
@@ -685,17 +687,18 @@ class ASC:
             exit(1)
 
 def main():
+    failurereportname = "failure_report.txt"
+
     parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
     parser.add_argument('apispec', help='Api specification file')
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
-    parser.add_argument('failurereportname', nargs="?", type=str, default="failure_report.txt")
-    parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 100% cov expected always. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
+    parser.add_argument('failurereportname', nargs="?", type=str, default=failurereportname, help=f"Name of failure report, if not given default is {failurereportname}. If similar named file exist, it will be overwritten.")
+    parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. full coverage expected always on next things. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
     parser.add_argument('--exclude', nargs='+', type=str, default=[], help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
     parser.add_argument('--suppressconsole', help="Suppress console outputs", action='store_true')
     parser.add_argument('--dontcrashincoveragefailure', action='store_true', help="Do not crash program in the end if coverage level is not fullfilled")
 
     args = parser.parse_args()
-
 
     asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude)
 
