@@ -25,9 +25,11 @@ class TerminalColors:
 
 
 class Endpoint:
-    def __init__(self, path, methods):
+    def __init__(self, path, methods, baseurl=""):
         self.path = path
         self.methods = methods
+        # Baseurl needed to eliminate changes for some weird urls in har to map incorrectly
+        self.baseurl = baseurl
 
     def input_log_entry(self, entry):
         # Input entry under correct method
@@ -50,19 +52,33 @@ class Endpoint:
         # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
             # Create search pattern by replacing path parameter with 'anything-but-slash' wildcard
-            search_pattern = re.sub('{.+}', '[^/]+', self.path) + "$"
+            # and can end with or without slash
+
+            # Not working...
+            search_pattern = re.sub('{.+}', '[^/]+', self.path) + "[/]?$"
 
             # Check if path matches to url
-            if re.search(search_pattern, url_parsed.path):
+            if re.search(self.baseurl + search_pattern, url_parsed.path):
                 return True
 
             pass
 
         else:
             # No path parameters
-            # TODO: Check if urllib may produce trailing slash to end of path
-            if url_parsed.path.endswith(self.path):
-                return True
+
+            # Take also case where request have ending slash
+            if url_parsed.path.endswith(self.path) or url_parsed.path.endswith(self.path + "/"):
+
+                # Compare with base url if it is not empty
+
+                # Still not absolutely perfect coverage but should be enough
+                #return True
+                if self.baseurl != "":
+                    if url_parsed.path.endswith(self.baseurl + self.path) or url_parsed.path.endswith(self.baseurl + self.path + "/"):
+                       return True
+                else:
+                    return True
+
 
         # No match found
         return False
@@ -113,8 +129,6 @@ class SingleMethod:
         # Array of anomalies, filled during analysis
         self.anomalies = []
 
-        self.analysis_result = "" # Starts to be futile?
-
     def add_entry(self, entry):
         # Add single entry to list
         self.logs.append(entry)
@@ -138,24 +152,7 @@ class SingleMethod:
         return response_not_used
 
     def analyze(self):
-        # Run analysis for this method and store all analysis for later inspections
-
-        # TODO: might be needed better structures and everything here too
-        analysis = {
-            'request_info_requestbody': ""
-        }
-
-        analysis_requestbody = None
-
-        if 'requestBody' in self.methodinfo.keys():
-            analysis_requestbody = self.methodinfo['requestBody']
-            analysis_requestbody['analysis'] = {
-                'values': [],
-                'count': 0
-            }
-            # for v3
-
-        # Should be working with api spec 3 too now
+        # Run analysis for this method and store all analysis to this singlemethods param and response objects
 
         # Run analysis for every log entry for this endpoint method
         for entry in self.logs:
@@ -172,7 +169,7 @@ class SingleMethod:
 
                     # TODO: Testing needed
                     paramvalue = re.search(path_prepart + '(?P<path_parameter_value>(.*)([^/]|$|[?]))', url).group('path_parameter_value')
-                    param.addUsage(paramvalue)
+                    param.add_usage(paramvalue)
 
                 elif param.location == 'query':
                     # Check query parameters as default way
@@ -182,7 +179,7 @@ class SingleMethod:
                     for queryparameter in entry['request']['queryString']:
                         if queryparameter['name'] == param.name:
                             paramvalue = queryparameter['value']
-                            param.addUsage(paramvalue)
+                            param.add_usage(paramvalue)
                             parameter_found = True
 
                     # Add anomaly if required parameter does not exist
@@ -201,7 +198,7 @@ class SingleMethod:
                     for headerparameter in entry['request']['headers']:
                         if headerparameter['name'] == param.name:
                             paramvalue = headerparameter['value']
-                            param.addUsage(paramvalue)
+                            param.add_usage(paramvalue)
 
                     # Add anomaly because request header parameter is not found
                     if param.required and not parameter_found:
@@ -217,11 +214,13 @@ class SingleMethod:
                     # Checks and validates body content of request and treats it as one parameter
                     # Openapi V3 does not have body parameter and it is replaced by 'requestBody' object
                     paramvalue = entry['request']['postData']['text']
-                    param.addUsage(paramvalue)
+                    param.add_usage(paramvalue)
 
                     # TODO: Possibly new feature to check and handle single schema fields as parameters if needed
 
                     # TODO: Consider making anomalies here: Those can be futile because sent data can be broken purposefully
+
+                    # TODO: Should here be broken body and violation of schema anomalies?
                     try:
                         ins = json.loads(paramvalue)
                     except:
@@ -250,7 +249,7 @@ class SingleMethod:
                         for formparam in entry['request']['postData']['params']:
                             if formparam['name'] == param.name:
                                 paramvalue = formparam['value']
-                                param.addUsage(paramvalue)
+                                param.add_usage(paramvalue)
 
                             # Data sended in parameter can be against api specification purposefully
                             # so making anomaly out of it may be most likely irrelevant
@@ -263,26 +262,16 @@ class SingleMethod:
 
                         for p_name, paramvalue in parseddata:
                             if p_name == param.name:
-                                param.addUsage(paramvalue)
+                                param.add_usage(paramvalue)
 
                             # Data sended in parameter can be against api specification purposefully
                             # so making anomaly out of it may be most likely irrelevant
 
-            # Analyze entry from the viewpoint of requestbodyparameter (OA v3) if it exists
-            # TODO: Determine what to do with requestbody
-            if analysis_requestbody != None:
-                if 'params' in entry['request']['postData']:
-                    # Is this futile?
-                    print("params values")
-                    print(entry['request']['postData']['params'])
-                elif 'text' in entry['request']['postData']:
-                    print("text values")
-                    print(entry['request']['postData']['text'])
-                    # tehdään eka oletuksella että text valueissa on asiat
+                # Requestbody (OA V3) is treated as like plain text body for now
+                elif param.location == "requestbody":
+                    # Requestbody is saved in text body in har file
                     body = entry['request']['postData']['text']
-                    analysis_requestbody['analysis']['values'].append(body)
-                    analysis_requestbody['analysis']['count'] += 1
-
+                    param.add_usage(body)
 
             # Analyzing responses
             response_code = str(entry['response']['status'])
@@ -290,7 +279,7 @@ class SingleMethod:
             for resp in self.responses:
                 if resp.code == response_code:
                     response_code_found = True
-                    resp.addUsage(entry['response']['content']['text'])
+                    resp.add_usage(entry['response']['content']['text'])
 
                     # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
                     # Now xml bodies are just skipped
@@ -321,7 +310,7 @@ class SingleMethod:
                     if resp.code == 'default':
                         default_response_exists = True
                         # Adding usage to default response
-                        resp.addUsage(entry['response']['content']['text'])
+                        resp.add_usage(entry['response']['content']['text'])
                         break
 
                 if default_response_exists:
@@ -333,8 +322,6 @@ class SingleMethod:
                         Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
                                 "Response code " + str(
                                     response_code) + " is not explictly defined in API specification, and default response is not present"))
-
-        self.analysis_result = analysis
 
     def print_method_analysis_to_console(self):
         # Just prints analysis fancy way
@@ -362,11 +349,6 @@ class SingleMethod:
                 print("\t" + TerminalColors.OKGREEN + f"Parameter named {param.name}  occurred {param.usage_count} time(s)" + TerminalColors.ENDC)
 
                 print("\t" + "\t" + f"Unique valued occurrences: {param_occurrence_count_unique}")
-
-        if self.analysis_result['request_info_requestbody'] != "":
-            # TODO: Rethink need of this and make another way of registertin parameters of requestbody
-            print("Parameters from requestBody (OAv3)")
-
 
         print('')
         print("Responses occurred:")
@@ -422,8 +404,9 @@ class Anomaly:
         self.description = description
 
 
-# TODO: should enum be added to location?
+# TODO: should enum be added to location? yes, more formal to handle i guess
 # Should this be handling also requestbody?
+# Should parameter class be changed to "requestparameter" or "requestcontent"
 class Parameter:
     def __init__(self, name, location, required=False, schema=None):
         self.name = name
@@ -433,7 +416,7 @@ class Parameter:
         self.usage_count = 0
         self.unique_values = set()
 
-    def addUsage(self, value):
+    def add_usage(self, value):
         # Increase counter and add value if uniq
         self.usage_count = self.usage_count + 1
         self.unique_values.add(value)
@@ -447,7 +430,7 @@ class Response:
         self.usage_count = 0
         self.unique_body_values = set()
 
-    def addUsage(self, value):
+    def add_usage(self, value):
         # Increase counter and add value if uniq
         # Should also default response be noted?
         self.usage_count = self.usage_count + 1
@@ -467,13 +450,13 @@ class ASC:
         self.endpoints = {}
         self.basepath = ""
 
-        self.version = ""
+        self.version = "" # Not used, is this futile?
 
         self.endpoints_excluded = endpoints_excluded
 
         self.coverage_level_required = coverage_level_required
 
-        # Set passing of coverage initially true
+        # Set passing of coverage initially true and later analysis can change it to false
         self.coverage_requirement_passed = True
 
     def read_har_file(self):
@@ -595,7 +578,9 @@ class ASC:
         # TODO: Determine proper json format and output as file, is schema needed?
         for endpoint in self.endpoints.keys():
             for method in self.endpoints[endpoint].methods.keys():
-                print(self.endpoints[endpoint].methods[method].analysis_result)
+                pass
+                #analysis result does not exist anymore
+                #print(self.endpoints[endpoint].methods[method].analysis_result)
 
     def analyze_coverage(self):
         '''
