@@ -47,38 +47,38 @@ class Endpoint:
         '''
 
         url_parsed = urlparse(url)
-        # TODO: do some testing to ensure working with 2 or more path parameters
+
+        # TODO: Consider giving endpoint also server name and other stuff to fiter out some weird ulrs
 
         # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
             # Create search pattern by replacing path parameter with 'anything-but-slash' wildcard
             # and can end with or without slash
 
-            # Not working...
-            search_pattern = re.sub('{.+}', '[^/]+', self.path) + "[/]?$"
+            # Non greedy replace of path parameters
+            search_pattern = re.sub('{.+?}', '[^/]+?', self.path) + "[/]?$"
 
             # Check if path matches to url
-            if re.search(self.baseurl + search_pattern, url_parsed.path):
-                return True
 
-            pass
+            if self.baseurl != "":
+                search_pattern = self.baseurl + search_pattern
+
+            if re.search(search_pattern, url_parsed.path):
+                return True
 
         else:
             # No path parameters
-
             # Take also case where request have ending slash
             if url_parsed.path.endswith(self.path) or url_parsed.path.endswith(self.path + "/"):
 
                 # Compare with base url if it is not empty
+                # Still not absolutely perfect coverage of special cases but should be enough
 
-                # Still not absolutely perfect coverage but should be enough
-                #return True
                 if self.baseurl != "":
                     if url_parsed.path.endswith(self.baseurl + self.path) or url_parsed.path.endswith(self.baseurl + self.path + "/"):
-                       return True
+                        return True
                 else:
                     return True
-
 
         # No match found
         return False
