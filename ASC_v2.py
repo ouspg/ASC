@@ -35,8 +35,11 @@ class Endpoint:
         # Input entry under correct method
         method_type = entry['request']['method'].lower()
 
-        # TODO: check if exists
-        self.methods[method_type].add_entry(entry)
+        if method_type in self.methods:
+            self.methods[method_type].add_entry(entry)
+
+        # TODO: Should we react if endpoints wrong method is called?
+        # Technically discarding anything that does not call correct endpoint in spec is ok
 
     def match_url_to_path(self, url):
         '''
@@ -48,7 +51,7 @@ class Endpoint:
 
         url_parsed = urlparse(url)
 
-        # TODO: Consider giving endpoint also server name and other stuff to fiter out some weird ulrs
+        # TODO: Consider giving endpoint also server name and other stuff to filter out some weird ulrs
 
         # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
@@ -162,14 +165,14 @@ class SingleMethod:
 
             for param in self.parameters:
                 if param.location == 'path':
-                    path_prepart = self.path.split('{' + param.name + '}')[0]
+                    # Use new utility function now
+                    paramvalue = path_parameter_extractor(url, self.path, param.name)
 
-                    # Replace path parameters in prepath with no-slash wildcard
-                    path_prepart = re.sub('{.+}', '[^/]+', path_prepart)
-
-                    # TODO: Testing needed
-                    paramvalue = re.search(path_prepart + '(?P<path_parameter_value>(.*)([^/]|$|[?]))', url).group('path_parameter_value')
-                    param.add_usage(paramvalue)
+                    if paramvalue != "":
+                        param.add_usage(paramvalue)
+                    else:
+                        # TODO: Think if anomaly needs to be added to this
+                        pass
 
                 elif param.location == 'query':
                     # Check query parameters as default way
@@ -234,7 +237,8 @@ class SingleMethod:
                     else:
                         try:
                             sch = json.loads(json.dumps(param['schema']))
-
+                            #print("validating instance")
+                            #print(ins)
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except:
                             self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
@@ -294,10 +298,13 @@ class SingleMethod:
                             ins = json.loads(entry['response']['content']['text'])
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except Exception as e:
-                            print(str(e))
-                            # TODO: Make exception and add anomaly
-                    break
+                            #print(str(e))
+                            self.anomalies.append(
+                                Anomaly(entry,
+                                          AnomalyType.INVALID_RESPONSE_BODY,
+                                          f"Validator produced validation error when validating response body. Error message:{str(e)}"))
 
+                    break
 
             if not response_code_found:
                 # Undefined response code detected
@@ -311,6 +318,20 @@ class SingleMethod:
                         default_response_exists = True
                         # Adding usage to default response
                         resp.add_usage(entry['response']['content']['text'])
+
+                        # Validate response schema of default response
+                        if resp.schema is not None:
+                            sch = json.loads(json.dumps(resp.schema))
+                            # Try parse and validate
+                            try:
+                                ins = json.loads(entry['response']['content']['text'])
+                                validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
+                            except Exception as e:
+                                self.anomalies.append(
+                                    Anomaly(entry,
+                                            AnomalyType.INVALID_RESPONSE_BODY,
+                                            "Validator produced validation error when validating default response body. Error message:{str(e)}"))
+
                         break
 
                 if default_response_exists:
@@ -395,6 +416,7 @@ class AnomalyType(Enum):
     UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED = 4
     BROKEN_RESPONSE_BODY = 5
     DEFAULT_RESPONSE_IS_NOT_USED = 6 # Is this error at all?
+    INVALID_RESPONSE_BODY = 7
 
 
 class Anomaly:
@@ -468,10 +490,14 @@ class ASC:
         # Parse API spec to endpoint and method objects with prance parser
 
         # NOTICE: OA v2 seems to be working fine with openapi spec validator and swagger validator too
+        try:
+            specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
+        except Exception as e:
+            print("Cannot parse API specification")
+            print("Error message:")
+            print(str(e))
+            exit(1)
 
-        specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
-
-        # TODO: Check if api is allowed version(s) and then proceed or crash
         self.version = specparser.version
 
         self.apispec = specparser.specification
@@ -485,8 +511,11 @@ class ASC:
             if 'parameters' in paths[endpoint].keys():
                 # Common parameters for endpoint exists
                 for param in paths[endpoint]['parameters']:
-                    # TODO: Add check if param is required
-                    params_endpoint.append(Parameter(param['name'], param['in']))
+                    param_required = False
+                    if 'required' in param:
+                        param_required = param['required']
+
+                    params_endpoint.append(Parameter(param['name'], param['in'], required=param_required))
 
             mthds = {}
 
@@ -500,10 +529,14 @@ class ASC:
                 if 'parameters' in paths[endpoint][method].keys():
                     # Common parameters for endpoint exists
                     for param in paths[endpoint][method]['parameters']:
-                        # TODO: Add check if param is required
-                        params_operation.append(Parameter(param['name'], param['in']))
+                        param_required = False
+                        if 'required' in param:
+                            param_required = param['required']
+
+                        params_operation.append(Parameter(param['name'], param['in'], required=param_required))
 
                 # Responses
+                # TODO: Consider if this should be changed to dict of responses (otherwise same, key as response code)
                 for code in paths[endpoint][method]['responses'].keys():
                     # Get schema if it exists
                     schema = None
@@ -537,7 +570,11 @@ class ASC:
                 params_final.extend(params_operation)
 
                 minfo = copy.deepcopy(paths[endpoint][method])
+
+                # Input responses and parameters to single method
                 mthds[method] = SingleMethod(method, endpoint, minfo, params_final, responses_operation)
+
+            # Create endpoint with list of method objects
             self.endpoints[endpoint] = (Endpoint(endpoint, mthds))
 
     def preprocess_har_entries(self):
@@ -659,7 +696,7 @@ class ASC:
                 file.write(fail + "\n")
 
     def export_large_report_text(self):
-        # TODO: Luodaan ihmisluettava iso rapsa, ei vaikutuksia ajomoodeilla, kaikki anomaliat ja vähäisetkin virheet mukaan
+        # TODO: Create full report, all data, all anomalies, should not be affected by setups (some exceptions)
         pass
 
     def crash_program(self, suppress_crash=False):
@@ -670,6 +707,7 @@ class ASC:
         if not self.coverage_requirement_passed:
             # Crash program
             exit(1)
+
 
 def main():
     failurereportname = "failure_report.txt"
@@ -696,7 +734,7 @@ def main():
     asc.crash_program(suppress_crash=args.dontcrashincoveragefailure)
 
 
-# TODO: Move both functions to utils
+# TODO: Consider moving both functions to utils file
 def get_multipart_boundary(req_entry):
 
     for header in req_entry['headers']:
@@ -730,6 +768,32 @@ def decode_multipart(text, boundary):
 
     return  parsed_items
 
+
+def path_parameter_extractor(url, path, parameter_name):
+
+    if path.find('{' + parameter_name + '}') != -1:
+        path_prepart = path.split('{' + parameter_name + '}')[0]
+
+        # If second part exists
+
+        # Replace path parameters in prepath with no-slash wildcard
+        path_prepart = re.sub('{.+?}', '[^/]+', path_prepart)
+
+        # TODO: Basic testing done, do couple more special cases
+        #paramvalue = re.search(path_prepart + '(?P<path_parameter_value>(.*)([^/]|$|[?]))', url).group(
+        #    'path_parameter_value')
+
+        result = re.search(path_prepart + '(?P<path_parameter_value>.+?(?=/|$))', url)
+
+        # If no match, then return empty value
+        if result is None:
+            return ""
+
+        return result.group('path_parameter_value')
+
+    else:
+        # Parameter name does not exist at all in path string
+        return ""
 
 if __name__ == '__main__':
     main()
