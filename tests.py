@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 from ASC_v2 import Endpoint
+from ASC_v2 import path_parameter_extractor
 
 
 class EndpointMatchUrlToPathCases(TestCase):
@@ -128,3 +129,58 @@ class EndpointMatchUrlToPathCases(TestCase):
         for expectfalseurl in falseurls:
             with self.subTest(msg="Expecting false match", pattern=self.testtendpoint3_2.path, url=expectfalseurl):
                 self.assertFalse(self.testtendpoint3_2.match_url_to_path(expectfalseurl))
+
+
+class PathParameterExtractionTests(TestCase):
+    '''
+    Testing path_parameter_extractor utility funtion
+    '''
+
+    def setUp(self) -> None:
+        pass
+    def tearDown(self) -> None:
+        pass
+
+    def test_no_parameter_in_path(self):
+
+        tests = [
+            ("http://localhost/v3/pet/somestaticthing/", "/pet/somestaticthing/{petId}", "petId", ""),
+            ("http://localhost/v3/pet/somestaticthing/999", "/pet/somestaticthing/{petId}", "notpetId", "")
+        ]
+
+        for test in tests:
+            with self.subTest(msg="Empty parameter should be found", url=test[0], pattern=test[1], paramname=test[2]):
+                self.assertEqual(path_parameter_extractor(test[0], test[1], test[2]), test[3])
+
+    def test_1_path_parameter_set1(self):
+        tests = [
+            ("http://localhost/v3/pet/somestaticthing/999", "/pet/somestaticthing/{petId}", "petId", "999"),
+            ("http://localhost/v3/pet/somestaticthing/asdf", "/pet/somestaticthing/{petId}", "petId", "asdf")
+        ]
+
+        for test in tests:
+            with self.subTest(msg="Right parameter should be found", url=test[0], pattern=test[1], paramname=test[2]):
+                self.assertEqual(path_parameter_extractor(test[0], test[1], test[2]), test[3])
+
+    def test_1_path_parameter_set2(self):
+        tests = [
+            ("http://localhost/v3/pet/somestaticthing/999/someotheraction", "/pet/somestaticthing/{petId}/someotheraction", "petId", "999"),
+            ("http://localhost/v3/pet/somestaticthing/asdf/pet", "/pet/somestaticthing/{petId}/pet", "petId", "asdf")
+        ]
+
+        for test in tests:
+            with self.subTest(msg="Right parameter should be found", url=test[0], pattern=test[1], paramname=test[2]):
+                self.assertEqual(path_parameter_extractor(test[0], test[1], test[2]), test[3])
+
+    def test_2_path_parameters(self):
+        tests = [
+            ("http://localhost/v3/pet/somestaticthing/999/888", "/pet/somestaticthing/{petId}/{otherId}", "petId", "999"),
+            ("http://localhost/v3/pet/somestaticthing/asdf/jkl", "/pet/somestaticthing/{petId}/{otherId}", "otherId", "jkl"),
+            ("http://localhost/v3/pet/somestaticthing/asdf/otherstaticthing/jkl", "/pet/somestaticthing/{petId}/otherstaticthing/{otherId}", "otherId", "jkl"),
+            ("http://localhost/v3/pet/somestaticthing/asdf/otherstaticthing/jkl",
+             "/pet/somestaticthing/{petId}/otherstaticthing/{otherId}", "petId", "asdf")
+        ]
+
+        for test in tests:
+            with self.subTest(msg="Right parameter should be found", url=test[0], pattern=test[1], paramname=test[2]):
+                self.assertEqual(path_parameter_extractor(test[0], test[1], test[2]), test[3])
