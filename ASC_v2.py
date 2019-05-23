@@ -30,6 +30,7 @@ class Endpoint:
         self.methods = methods
         # Baseurl needed to eliminate changes for some weird urls in har to map incorrectly
         self.baseurl = baseurl
+        self.usage_count = 0
 
     def input_log_entry(self, entry):
         # Input entry under correct method
@@ -37,6 +38,7 @@ class Endpoint:
 
         if method_type in self.methods:
             self.methods[method_type].add_entry(entry)
+            self.usage_count = self.usage_count + 1
 
         # TODO: Should we react if endpoints wrong method is called?
         # Technically discarding anything that does not call correct endpoint in spec is ok
@@ -86,11 +88,11 @@ class Endpoint:
         # No match found
         return False
 
-    def print_endpoint_analysis_to_console(self):
+    def print_endpoint_analysis_to_console(self, suppressed_anomaly=False):
         # Print analysis
         for mtd in self.methods.keys():
             print(TerminalColors.HEADER + f"Endpoint {self.path} - method {mtd}" + TerminalColors.ENDC)
-            self.methods[mtd].print_method_analysis_to_console()
+            self.methods[mtd].print_method_analysis_to_console(suppressed_anomaly=suppressed_anomaly)
             print('')
             print('')
 
@@ -142,6 +144,9 @@ class SingleMethod:
             return True
         else:
             return False
+
+    def get_usage_count(self):
+        return len(self.logs)
 
     def get_responses_not_used(self):
         # return array of responses not used
@@ -312,6 +317,8 @@ class SingleMethod:
 
                 # TODO: Closer inspection on default schemas and stuff needed
 
+                # TODO: add to anomalies like: error produced by xxx validator
+
                 default_response_exists = False
                 for resp in self.responses:
                     if resp.code == 'default':
@@ -344,7 +351,7 @@ class SingleMethod:
                                 "Response code " + str(
                                     response_code) + " is not explictly defined in API specification, and default response is not present"))
 
-    def print_method_analysis_to_console(self):
+    def print_method_analysis_to_console(self, suppressed_anomaly=False):
         # Just prints analysis fancy way
 
         total_count = len(self.logs)
@@ -396,9 +403,11 @@ class SingleMethod:
         print('')
         if len(self.anomalies) > 0:
             print(f"Anomaly entries in traffic: {len(self.anomalies)}")
-            for anomaly_entry in self.anomalies:
-                print("\t" + f"Anomaly description: {anomaly_entry.description}")
-                print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry.entry}")
+
+            if suppressed_anomaly is not True:
+                for anomaly_entry in self.anomalies:
+                    print("\t" + f"Anomaly description: {anomaly_entry.description}")
+                    print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry.entry}")
 
 
 class Schema:
@@ -443,6 +452,8 @@ class Parameter:
         self.usage_count = self.usage_count + 1
         self.unique_values.add(value)
 
+    def get_unique_usage_count(self):
+        return len(self.unique_values)
 
 class Response:
     def __init__(self, code, schema):
@@ -458,9 +469,13 @@ class Response:
         self.usage_count = self.usage_count + 1
         self.unique_body_values.add(value)
 
+    def get_unique_usage_count(self):
+        return len(self.unique_body_values)
+
 
 class ASC:
-    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0):
+    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0,
+                 parameter_coverage_level_required=0):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
 
@@ -477,9 +492,13 @@ class ASC:
         self.endpoints_excluded = endpoints_excluded
 
         self.coverage_level_required = coverage_level_required
+        self.parameter_coverage_level_required = parameter_coverage_level_required
 
         # Set passing of coverage initially true and later analysis can change it to false
         self.coverage_requirement_passed = True
+
+        self.total_api_usages = 0
+        self.total_har_entries = 0
 
     def read_har_file(self):
         # Initialize har parser object
@@ -583,12 +602,14 @@ class ASC:
         # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
         for page in self.harobject.pages:
             for entry in page.entries:
+                self.total_har_entries = self.total_har_entries + 1
                 url = entry['request']['url']
                 endpoint_found = False
                 for endpoint in self.endpoints.keys():
                     if self.endpoints[endpoint].match_url_to_path(url):
                         self.endpoints[endpoint].input_log_entry(entry)
                         endpoint_found = True
+                        self.total_api_usages = self.total_api_usages + 1
                         break
 
                 if not endpoint_found:
@@ -599,14 +620,14 @@ class ASC:
         for endpoint in self.endpoints.keys():
             self.endpoints[endpoint].analyze_endpoint()
 
-    def print_analysis_to_console(self, suppressed=False):
+    def print_analysis_to_console(self, suppressed=False, suppressed_anomaly=False):
         # Print full analysis to console if it is not suppressed
         if suppressed:
             return
 
         # Export results to command line
         for endpoint in self.endpoints.keys():
-            self.endpoints[endpoint].print_endpoint_analysis_to_console()
+            self.endpoints[endpoint].print_endpoint_analysis_to_console(suppressed_anomaly=suppressed_anomaly)
 
     def export_large_report_json(self):
         # Exports json report
@@ -627,7 +648,7 @@ class ASC:
         :return:
         '''
         # TODO: If 'treat undefined response as error' flag or something is specified, add it here accordingly
-        # TODO: If coverage level 4 (=parameter coverage) is added, add it here accordingly
+        # TODO: Does it make sense to use enums as coverage levels, argparse should support, at least argparse-utils
 
         # Coverage based on given level to determine if failed or not and failure reasons as string array
         coverage_level_fulfilled = True
@@ -673,8 +694,27 @@ class ASC:
                         coverage_level_fulfilled = False
                         coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} response {resp} is not used")
 
-        return coverage_level_fulfilled, coverage_level_failure_reasons
+        if self.parameter_coverage_level_required in ["1", "2"]:
+            # Check parameter coverage
+            # Every mentioned api parameter must be used once
+            # TODO: Parameter exclusion, how to implement?
+            for endpoint in self.endpoints.keys():
+                # Skip excluded endpoints
+                if endpoint in self.endpoints_excluded:
+                    continue
 
+                for mtd in self.endpoints[endpoint].methods.keys():
+                    for param in self.endpoints[endpoint].methods[mtd].parameters:
+                        if self.parameter_coverage_level_required == "1":
+                            if param.usage_count == 0:
+                                coverage_level_fulfilled = False
+                                coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} not used")
+                        elif self.parameter_coverage_level_required == "2":
+                            if len(param.unique_values) < 2:
+                                coverage_level_fulfilled = False
+                                coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} used uniquely {len(param.unique_values)} times. 2 unique usages required to fullfill this coverage requirement")
+
+        return coverage_level_fulfilled, coverage_level_failure_reasons
 
     def export_failure_report(self, failure_report_filename):
         '''
@@ -695,12 +735,52 @@ class ASC:
             for fail in failures:
                 file.write(fail + "\n")
 
+    def export_anomaly_report(self, anomaly_report_filename):
+        '''
+        :param anomaly_report_filename:
+        Creates report listing only anomalies
+        Anomalies categorized under each endpoint and type
+        :return:
+        '''
+        # TODO: Is it sensible to use anomaly type as only numeric enum
+        with open(anomaly_report_filename, 'w') as file:
+
+            for endpoint in self.endpoints.keys():
+                for method in self.endpoints[endpoint].methods.keys():
+                    header = f"Endpoint {endpoint} - method {method.upper()} \n"
+                    file.write(header)
+                    # TODO: do sorting
+                    # TODO: subheadering
+                    for anomaly in self.endpoints[endpoint].methods[method].anomalies:
+                        #print(anomaly)
+                        file.write(anomaly.description + "\n")
+                        file.write(str(anomaly.entry) + "\n")
+
     def export_large_report_text(self):
         # TODO: Create full report, all data, all anomalies, should not be affected by setups (some exceptions)
+
+        # Structure of large report
+        # First must be overview data
+        #   - Total requests, total requests on api
+        #   - Percentages and numbers on everything
+        #       - Number and percentage of endpoints covered (mention excluded)
+        #       - Number and percentage of methods covered (mention exluced)
+        #       - Number and percentage of responses covered (mention exluced)
+        #       - Number and percentage of parameters covered (mention exluced)
+        #   - Point of failures
+        #       - Well, not actually needed, failure raport exists and this should not depend on cov level, and stuff isindicated already
+        # Rest should concentrate individual endpoit/method analysis as list
+        #   - Total usage number on parameters, responses and method etc
+        #   - Unique uses on all those etc
+        #   - Anomaly listing and stuff
+
+        # Should it be made with like jinja raport?
+
         pass
 
     def crash_program(self, suppress_crash=False):
         # Crash program with exit code 1 if needed and not suppressed
+        # This intends to serve Jenkins or other CI tool purposes to indicate that testing is not good enough
         if suppress_crash:
             return
 
@@ -711,26 +791,33 @@ class ASC:
 
 def main():
     failurereportname = "failure_report.txt"
+    anomalyreportname = "anomaly_report.txt"
 
     parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
     parser.add_argument('apispec', help='Api specification file')
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
     parser.add_argument('failurereportname', nargs="?", type=str, default=failurereportname, help=f"Name of failure report, if not given default is {failurereportname}. If similar named file exist, it will be overwritten.")
+    parser.add_argument('anomalyreportname', nargs="?", type=str, default=anomalyreportname,
+                        help=f"Name of failure report, if not given default is {anomalyreportname}. If similar named file exist, it will be overwritten.")
     parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. full coverage expected always on next things. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
+    parser.add_argument('--parametercoveragelevel', help='Specify parameter coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 1 = require parameter to be used at least once, 2 = require parameter to be used with 2 unique values')
     parser.add_argument('--exclude', nargs='+', type=str, default=[], help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
     parser.add_argument('--suppressconsole', help="Suppress console outputs", action='store_true')
+    parser.add_argument('--suppressconsoleanomalies', help="Suppress listing of full anomalies in console output", action='store_true')
     parser.add_argument('--dontcrashincoveragefailure', action='store_true', help="Do not crash program in the end if coverage level is not fullfilled")
 
     args = parser.parse_args()
 
-    asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude)
+    asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude,
+              parameter_coverage_level_required=args.parametercoveragelevel)
 
     asc.read_api_specification()
     asc.read_har_file()
     asc.preprocess_har_entries()
     asc.analyze()
-    asc.print_analysis_to_console(suppressed=args.suppressconsole)
+    asc.print_analysis_to_console(suppressed=args.suppressconsole, suppressed_anomaly=args.suppressconsoleanomalies)
     asc.export_failure_report(args.failurereportname)
+    asc.export_anomaly_report(args.anomalyreportname)
     asc.crash_program(suppress_crash=args.dontcrashincoveragefailure)
 
 
@@ -780,9 +867,6 @@ def path_parameter_extractor(url, path, parameter_name):
         path_prepart = re.sub('{.+?}', '[^/]+', path_prepart)
 
         # TODO: Basic testing done, do couple more special cases
-        #paramvalue = re.search(path_prepart + '(?P<path_parameter_value>(.*)([^/]|$|[?]))', url).group(
-        #    'path_parameter_value')
-
         result = re.search(path_prepart + '(?P<path_parameter_value>.+?(?=/|$))', url)
 
         # If no match, then return empty value
@@ -794,6 +878,7 @@ def path_parameter_extractor(url, path, parameter_name):
     else:
         # Parameter name does not exist at all in path string
         return ""
+
 
 if __name__ == '__main__':
     main()
