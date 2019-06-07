@@ -1,0 +1,44 @@
+ASC - Large report
+
+Common info here
+    - report creation time
+    - har timestamps between x - y
+    - api name
+    - openapi version
+
+Report creation time: {{common_info.time_report_creation}}
+Analysis initiated: {{data.analysis_initiated}}
+
+Common testing info
+
+Entries in har: {{common_info.count_har_entries}}
+Entries in har touching API: {{common_info.count_har_entries_touching_api}}
+
+Entries in har: {{data.total_har_entries}}
+Entries in har using API: {{data.total_api_usages}}
+
+Total number of endpoints: {{data.total_endpoints_count}}
+Total number of used endpoints {{data.total_endpoints_used}}
+
+Total number of methods: {{data.total_methods_in_endpoints_count}}
+Total number of methods used: {{data.total_methods_in_endpoints_used}}
+
+Total responses as same, finalize later
+
+Endpoints:
+
+{% for endpoint in data.endpoints %}
+Endpoint: {{endpoint.path}}
+    Usage count: {{endpoint.usage_count}}
+    Methods count: {{endpoint.methods_count}}
+    Methods used: {{endpoint.methods_used}}
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    {% for type, method in endpoint.methods.items() %}
+        Type: {{type}}
+        Analysis of counts, responses, parameters TBA
+    {% endfor %}
+
+{% endfor %}

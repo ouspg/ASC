@@ -12,6 +12,10 @@ from enum import Enum
 
 from prance import ResolvingParser
 
+from jinja2 import Environment, FileSystemLoader
+
+import time
+
 # Colors from here https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
 
 
@@ -25,12 +29,23 @@ class TerminalColors:
 
 
 class Endpoint:
-    def __init__(self, path, methods, baseurl=""):
+    def __init__(self, path, methods, baseurl="", excluded=False):
         self.path = path
         self.methods = methods
         # Baseurl needed to eliminate changes for some weird urls in har to map incorrectly
-        self.baseurl = baseurl
+        self.baseurl = baseurl # Baseurl currently futile?
         self.usage_count = 0
+        self.excluded = excluded
+
+        self.methods_count = len(self.methods)
+        self.methods_used = 0
+
+        # Consider if these are futile or useful
+        self.response_codes_in_methods_count = 0
+        self.response_codes_in_methods_used = 0
+
+        self.default_response_codes_in_methods_count = 0
+        self.default_response_codes_in_methods_used = 0
 
     def input_log_entry(self, entry):
         # Input entry under correct method
@@ -42,6 +57,7 @@ class Endpoint:
 
         # TODO: Should we react if endpoints wrong method is called?
         # Technically discarding anything that does not call correct endpoint in spec is ok
+        # Technically it is anomalious act too
 
     def match_url_to_path(self, url):
         '''
@@ -100,6 +116,21 @@ class Endpoint:
         for mtd in self.methods.keys():
             self.methods[mtd].analyze()
 
+            if self.methods[mtd].is_used():
+                self.methods_used += 1
+
+        # Collect and combine information from all analyzed methods
+        # Might need heavy refactoring
+        for mtd in self.methods.keys():
+            self.response_codes_in_methods_count += self.methods[mtd].response_codes_count
+            self.response_codes_in_methods_used += self.methods[mtd].response_codes_used
+
+            if self.methods[mtd].default_response_exists:
+                self.default_response_codes_in_methods_count += 1
+
+                if self.methods[mtd].default_response_used:
+                    self.default_response_codes_in_methods_used += 1
+
     def get_methods_not_used(self):
         # Simply returns array of methods existing but not used (GET POST etc)
         methods_not_used = []
@@ -117,6 +148,17 @@ class Endpoint:
 
         return False
 
+    def get_as_dictionary(self):
+        endpoint_dict = {
+            'path': self.path,
+            'usage_count': self.usage_count,
+            'methods': {}
+        }
+        for method_type in self.methods.keys():
+            endpoint_dict['methods'][method_type] = self.methods[method_type].get_as_dictionary()
+
+        return endpoint_dict
+
 
 # Class for single method
 class SingleMethod:
@@ -133,6 +175,20 @@ class SingleMethod:
 
         # Array of anomalies, filled during analysis
         self.anomalies = []
+
+        # Analysis results for reporting
+        self.default_response_exists = False
+
+        self.response_codes_count = len(responses)
+        self.response_codes_used = 0
+
+        for r in self.responses:
+            if r.code == 'default':
+                self.default_response_exists = True
+                self.response_codes_count -= 1
+                break
+
+        self.default_response_used = False
 
     def add_entry(self, entry):
         # Add single entry to list
@@ -158,6 +214,37 @@ class SingleMethod:
                 response_not_used.append(response.code)
 
         return response_not_used
+
+    def get_as_dictionary(self):
+        singlemethod_dictionary = {
+            'logs': self.logs,
+            'anomalies': [],
+            'parameters': [],
+            'responses': [],
+            'response_codes_count': self.response_codes_count,
+            'response_codes_used': self.response_codes_used,
+            'default_response_exists': self.default_response_exists,
+            'default_response_used': self.default_response_used
+        }
+
+        params = []
+        resps = []
+        anoms = []
+
+        for r in self.responses:
+            resps.append(r.get_as_dictionary())
+
+        for p in self.parameters:
+            params.append(p.get_as_dictionary())
+
+        for a in self.parameters:
+            anoms.append(a.get_as_dictionary())
+
+        singlemethod_dictionary['parameters'] = params
+        singlemethod_dictionary['responses'] = resps
+        singlemethod_dictionary['anomalies'] = anoms
+
+        return singlemethod_dictionary
 
     def analyze(self):
         # Run analysis for this method and store all analysis to this singlemethods param and response objects
@@ -351,6 +438,19 @@ class SingleMethod:
                                 "Response code " + str(
                                     response_code) + " is not explictly defined in API specification, and default response is not present"))
 
+        # Add calculations of parameters and responses of this endpoint
+        for r in self.responses:
+            if r.code != 'default':
+                if r.usage_count != 0:
+                    self.response_codes_used += 1
+            elif r.code == 'default':
+                if r.usage_count != 0:
+                    self.default_response_used = True
+
+        # TODO: Same as above with params
+
+
+
     def print_method_analysis_to_console(self, suppressed_anomaly=False):
         # Just prints analysis fancy way
 
@@ -434,6 +534,15 @@ class Anomaly:
         self.type = type
         self.description = description
 
+    def get_as_dictionary(self):
+        anomaly_dictionary = {
+            'entry': self.entry,
+            'type': self.type,
+            'description': self.description
+        }
+
+        return anomaly_dictionary
+
 
 # TODO: should enum be added to location? yes, more formal to handle i guess
 # Should this be handling also requestbody?
@@ -455,6 +564,19 @@ class Parameter:
     def get_unique_usage_count(self):
         return len(self.unique_values)
 
+    def get_as_dictionary(self):
+        parameter_dictionary = {
+            'name': self.name,
+            'location': self.location,
+            'required': self.required,
+            'schema': self.schema,
+            'usage_count': self.usage_count,
+            'unique_values': list(self.unique_values)
+        }
+
+        return parameter_dictionary
+
+
 class Response:
     def __init__(self, code, schema):
         self.code = code
@@ -471,6 +593,16 @@ class Response:
 
     def get_unique_usage_count(self):
         return len(self.unique_body_values)
+
+    def get_as_dictionary(self):
+        response_dictionary = {
+            'code': self.code,
+            'schema': self.schema,
+            'usage_count': self.usage_count,
+            'unique_body_values': list(self.unique_body_values)
+        }
+
+        return response_dictionary
 
 
 class ASC:
@@ -499,6 +631,22 @@ class ASC:
 
         self.total_api_usages = 0
         self.total_har_entries = 0
+
+        # Combined information from methods, determine if this could be refactored
+        self.total_response_codes_count = 0
+        self.total_response_codes_used = 0
+        self.total_default_responses_count = 0
+        self.total_default_responses_used = 0
+
+        self.total_methods_in_endpoints_count = 0
+        self.total_methods_in_endpoints_used = 0
+
+        # Initiation time
+        self.analysis_initiated = time.strftime("%H:%M:%S %d.%m.%Y")
+
+        # Endpoint analysis
+        self.endpoints_count = 0
+        self.endpoints_used = 0
 
     def read_har_file(self):
         # Initialize har parser object
@@ -619,6 +767,22 @@ class ASC:
         # Trigger every endppoint analysis
         for endpoint in self.endpoints.keys():
             self.endpoints[endpoint].analyze_endpoint()
+
+            # Collect info from endpoint after it has been analyzed
+            self.total_response_codes_count += self.endpoints[endpoint].response_codes_in_methods_count
+            self.total_response_codes_used += self.endpoints[endpoint].response_codes_in_methods_count
+
+            self.total_default_responses_count += self.endpoints[endpoint].default_response_codes_in_methods_count
+            self.total_default_responses_used += self.endpoints[endpoint].default_response_codes_in_methods_used
+
+            self.total_methods_in_endpoints_count += self.endpoints[endpoint].methods_count
+            self.total_methods_in_endpoints_used += self.endpoints[endpoint].methods_used
+
+            if self.endpoints[endpoint].is_used():
+                self.endpoints_used += 1
+
+        # Endpoints total count
+        self.endpoints_count = len(self.endpoints)
 
     def print_analysis_to_console(self, suppressed=False, suppressed_anomaly=False):
         # Print full analysis to console if it is not suppressed
@@ -756,6 +920,32 @@ class ASC:
                         file.write(anomaly.description + "\n")
                         file.write(str(anomaly.entry) + "\n")
 
+    def get_all_report_data_as_dictionary(self):
+
+        all_data_dictionary = {
+            'total_api_usages': self.total_api_usages,
+            'total_har_entries': self.total_har_entries,
+            'analysis_initiation_time': self.analysis_initiated,
+            'endpoints': [],
+            'total_endpoints_count': self.endpoints_count,
+            'total_endpoints_used': self.endpoints_used,
+            'total_response_codes_count': self.total_response_codes_count,
+            'total_response_codes_used': self.total_response_codes_used,
+            'total_default_responses_count': self.total_default_responses_count,
+            'total_default_responses_used': self.total_default_responses_used,
+            'total_methods_in_endpoints_count': self.total_methods_in_endpoints_count,
+            'total_methods_in_endpoints_used': self.total_methods_in_endpoints_used
+        }
+
+        endpoint_dictionaries = []
+
+        for e in self.endpoints:
+            endpoint_dictionaries.append(self.endpoints[e].get_as_dictionary())
+
+        all_data_dictionary['endpoints'] = endpoint_dictionaries
+
+        return all_data_dictionary
+
     def export_large_report_text(self):
         # TODO: Create full report, all data, all anomalies, should not be affected by setups (some exceptions)
 
@@ -776,7 +966,39 @@ class ASC:
 
         # Should it be made with like jinja raport?
 
-        pass
+        # Make mockup data
+        common_info = {
+            'time_report_creation': 'asd',
+            'time_har_entries_start': 'qwe',
+            'time_har_entries_end': 'qweqwer',
+            'api_name': 'apiname',
+            'count_har_entries': 100,
+            'count_har_entries_touching_api': 50
+        }
+
+        coverage_info = {
+            'endpoints_total': 6,
+            'endpoints_covered': 5,
+            'methods_total': 12,
+            'methods_covered': 9,
+            'responses_total': 33,
+            'responses_covered': 15,
+            'parameters_total': 28,
+            'parameters_covered': 28
+        }
+
+        all_data = self.get_all_report_data_as_dictionary()
+
+        #print(json.dumps(self.get_all_report_data_as_dictionary(), sort_keys=True, indent=4))
+
+        env = Environment(
+            loader=FileSystemLoader('Templates/')
+        )
+
+        template = env.get_template('large_report.txt')
+
+        template.stream(common_info=common_info,
+                        data=all_data).dump('large_report_output.txt')
 
     def crash_program(self, suppress_crash=False):
         # Crash program with exit code 1 if needed and not suppressed
@@ -818,6 +1040,7 @@ def main():
     asc.print_analysis_to_console(suppressed=args.suppressconsole, suppressed_anomaly=args.suppressconsoleanomalies)
     asc.export_failure_report(args.failurereportname)
     asc.export_anomaly_report(args.anomalyreportname)
+    asc.export_large_report_text()
     asc.crash_program(suppress_crash=args.dontcrashincoveragefailure)
 
 
