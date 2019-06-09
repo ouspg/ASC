@@ -152,6 +152,8 @@ class Endpoint:
         endpoint_dict = {
             'path': self.path,
             'usage_count': self.usage_count,
+            'methods_count': self.methods_count,
+            'methods_used': self.methods_used,
             'methods': {}
         }
         for method_type in self.methods.keys():
@@ -571,7 +573,8 @@ class Parameter:
             'required': self.required,
             'schema': self.schema,
             'usage_count': self.usage_count,
-            'unique_values': list(self.unique_values)
+            'unique_values': list(self.unique_values),
+            'unique_values_count': self.get_unique_usage_count()
         }
 
         return parameter_dictionary
@@ -599,7 +602,8 @@ class Response:
             'code': self.code,
             'schema': self.schema,
             'usage_count': self.usage_count,
-            'unique_body_values': list(self.unique_body_values)
+            'unique_body_values': list(self.unique_body_values),
+            'unique_body_values_count': self.get_unique_usage_count()
         }
 
         return response_dictionary

@@ -38,7 +38,45 @@ Endpoint: {{endpoint.path}}
 
     {% for type, method in endpoint.methods.items() %}
         Type: {{type}}
-        Analysis of counts, responses, parameters TBA
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            {% for response in method.responses %}
+            Response code: {{response.code}}
+                Usage count: {{response.usage_count}}
+                Unique body values: {{response.unique_body_values_count}}
+                {% for ubv in response.unique_body_values %}
+                    {{ubv}}
+                {% endfor %}
+                Shema: TBA
+
+            {% endfor %}
+        Parameters:
+            {% for parameter in method.parameters %}
+            Parameter name: {{parameter.name}}
+                Location: {{parameter.location}}
+                Required: {{parameter.required}}
+                Schema: TBA
+                Usage count: {{parameter.usage_count}}
+                Unique values: {{parameter.unique_values_count}}
+                {% for uv in parameter.unique_values %}
+                    {{uv}}
+                {% endfor %}
+
+            {% endfor %}
+        Anomalies:
+            {% for anomaly in method.anomalies %}
+                Description: {{anomaly.description}}
+                Entry: {{anomaly.entry}}
+            {% endfor %}
+
+        Logs:
+            {% for entry in method.logs %}
+                {{entry}}
+            {% endfor %}
+
+
     {% endfor %}
 
 {% endfor %}
