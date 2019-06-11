@@ -104,14 +104,6 @@ class Endpoint:
         # No match found
         return False
 
-    def print_endpoint_analysis_to_console(self, suppressed_anomaly=False):
-        # Print analysis
-        for mtd in self.methods.keys():
-            print(TerminalColors.HEADER + f"Endpoint {self.path} - method {mtd}" + TerminalColors.ENDC)
-            self.methods[mtd].print_method_analysis_to_console(suppressed_anomaly=suppressed_anomaly)
-            print('')
-            print('')
-
     def analyze_endpoint(self):
         for mtd in self.methods.keys():
             self.methods[mtd].analyze()
@@ -220,13 +212,15 @@ class SingleMethod:
     def get_as_dictionary(self):
         singlemethod_dictionary = {
             'logs': self.logs,
+            'usage_count': self.get_usage_count(),
             'anomalies': [],
             'parameters': [],
             'responses': [],
             'response_codes_count': self.response_codes_count,
             'response_codes_used': self.response_codes_used,
             'default_response_exists': self.default_response_exists,
-            'default_response_used': self.default_response_used
+            'default_response_used': self.default_response_used,
+            'anomalies_count': 0
         }
 
         params = []
@@ -239,12 +233,14 @@ class SingleMethod:
         for p in self.parameters:
             params.append(p.get_as_dictionary())
 
-        for a in self.parameters:
+        for a in self.anomalies:
             anoms.append(a.get_as_dictionary())
 
         singlemethod_dictionary['parameters'] = params
         singlemethod_dictionary['responses'] = resps
         singlemethod_dictionary['anomalies'] = anoms
+
+        singlemethod_dictionary['anomalies_count'] = len(anoms)
 
         return singlemethod_dictionary
 
@@ -450,66 +446,6 @@ class SingleMethod:
                     self.default_response_used = True
 
         # TODO: Same as above with params
-
-
-
-    def print_method_analysis_to_console(self, suppressed_anomaly=False):
-        # Just prints analysis fancy way
-
-        total_count = len(self.logs)
-
-        if total_count == 0:
-            print("\t" + TerminalColors.FAIL + f"Total number of request/responses: {total_count}" + TerminalColors.ENDC)
-            return
-        else:
-            print("\t" + TerminalColors.OKGREEN + f"Total number of request/responses: {total_count}" + TerminalColors.ENDC)
-
-        print('')
-        print("Parameters occurred in requests:")
-
-        # Analyzing stored parameters
-        for param in self.parameters:
-
-            # Unique count from set (set is always uniq)
-            param_occurrence_count_unique = len(param.unique_values)
-
-            if param.usage_count == 0:
-                print("\t" + TerminalColors.FAIL + f"Parameter named {param.name} never occurred" + TerminalColors.ENDC)
-            else:
-                print("\t" + TerminalColors.OKGREEN + f"Parameter named {param.name}  occurred {param.usage_count} time(s)" + TerminalColors.ENDC)
-
-                print("\t" + "\t" + f"Unique valued occurrences: {param_occurrence_count_unique}")
-
-        print('')
-        print("Responses occurred:")
-
-        for response in self.responses:
-            if response.code == 'default':
-                # Custom prints for default response
-                print("\t" + f"Default response")
-                print("\t\t" + f"{response.usage_count} responses which are not corresponding any other response codes")
-                break
-
-            response_occurrence_count_unique = len(response.unique_body_values)
-
-            print("\t" + f"Response code {response.code}")
-
-            if response.usage_count > 0:
-                print("\t" + TerminalColors.OKGREEN + f"Total occurrences: {response.usage_count}" + TerminalColors.ENDC)
-                print("\t" + "\t" + f"Unique valued response content occurrences: {response_occurrence_count_unique}")
-            else:
-                print("\t" + TerminalColors.FAIL + f"Total occurrences: {response.usage_count}" + TerminalColors.ENDC)
-
-            print('')
-
-        print('')
-        if len(self.anomalies) > 0:
-            print(f"Anomaly entries in traffic: {len(self.anomalies)}")
-
-            if suppressed_anomaly is not True:
-                for anomaly_entry in self.anomalies:
-                    print("\t" + f"Anomaly description: {anomaly_entry.description}")
-                    print("\t" + f"Anomalic request entry in HAR file: {anomaly_entry.entry}")
 
 
 class Schema:
@@ -808,14 +744,63 @@ class ASC:
         # Endpoints total count
         self.endpoints_count = len(self.endpoints)
 
-    def print_analysis_to_console(self, suppressed=False, suppressed_anomaly=False):
-        # Print full analysis to console if it is not suppressed
-        if suppressed:
-            return
+    def print_analysis_to_console(self, suppress_anomalies):
 
-        # Export results to command line
-        for endpoint in self.endpoints.keys():
-            self.endpoints[endpoint].print_endpoint_analysis_to_console(suppressed_anomaly=suppressed_anomaly)
+        # Get calculated data as basic dictionary form and output it sensibly to console
+        data = self.get_all_report_data_as_dictionary()
+
+        # TODO: Add some common information printing before printing endpoints
+
+        for endpoint in data['endpoints']:
+            print(TerminalColors.HEADER + f"Endpoint {endpoint['path']}" + TerminalColors.ENDC)
+
+            usage_count_color = TerminalColors.OKGREEN
+            if endpoint['usage_count'] == 0:
+                usage_count_color = TerminalColors.FAIL
+
+            print("\t" + usage_count_color + f"Usage count {endpoint['usage_count']}" + TerminalColors.ENDC)
+
+            for method_type, method in endpoint['methods'].items():
+                print("\t" + TerminalColors.HEADER + f"Method type {method_type}" + TerminalColors.ENDC)
+
+                usage_count_color = TerminalColors.OKGREEN
+
+                if method['usage_count'] == 0:
+                    usage_count_color = TerminalColors.FAIL
+
+                print("\t" + "\t" + usage_count_color + f"Usage count {method['usage_count']}" + TerminalColors.ENDC)
+
+                print("\t" + "Parameters")
+                for parameter in method['parameters']:
+                    print("\t" + "\t" + f"Parameter name {parameter['name']}")
+                    usage_count_color = TerminalColors.OKGREEN
+
+                    if parameter['usage_count'] == 0:
+                        usage_count_color = TerminalColors.FAIL
+
+                    print("\t" + "\t" + "\t" +usage_count_color + f"Usage count {parameter['usage_count']}" + TerminalColors.ENDC)
+
+                    print("\t" + "\t" + "\t" + f"Unique values count {parameter['unique_values_count']}")
+
+                print("\t" + "Responses")
+                for response in method['responses']:
+                    print("\t" + "\t" + f"Response {response['code']}")
+                    usage_count_color = TerminalColors.OKGREEN
+
+                    if response['usage_count'] == 0:
+                        usage_count_color = TerminalColors.FAIL
+
+                    print("\t" + "\t" + "\t" + usage_count_color + f"Usage count {response['usage_count']}" + TerminalColors.ENDC)
+
+                    print("\t" + "\t" + "\t" + f"Unique response bodies count {response['unique_body_values_count']}")
+
+                print("\t" + f"Anomaly count: {method['anomalies_count']}")
+
+                if (suppress_anomalies is False) and (method['anomalies_count'] > 0):
+                    print("\t" + "\t" +"Anomalies")
+                    for anomaly in method['anomalies']:
+                        print(anomaly['description'])
+                        print(anomaly['entry'])
 
     def export_large_report_json(self):
         # Exports json report
@@ -1043,7 +1028,7 @@ def main():
     asc.read_har_file()
     asc.preprocess_har_entries()
     asc.analyze()
-    asc.print_analysis_to_console(suppressed=args.suppressconsole, suppressed_anomaly=args.suppressconsoleanomalies)
+    asc.print_analysis_to_console(False)
     asc.export_failure_report(args.failurereportname)
     asc.export_anomaly_report(args.anomalyreportname)
     asc.export_large_report_text()
