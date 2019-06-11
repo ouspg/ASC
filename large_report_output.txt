@@ -1,0 +1,1067 @@
+ASC - Large report
+
+OpenAPI version: TBA 
+API name: OpenAPI Petstore
+API version: 1.0.0
+API description: This is a sample server Petstore server. For this sample, you can use the api key `special-key` to test the authorization filters. For OAuth2 flow, you may use `user` as both username and password when asked to login.
+
+Analysis initiated: 13:44:38 11.06.2019
+
+HAR file first timestamp: TBA
+
+Common testing info
+
+Entries in har: 22
+Entries in har using API: 11
+
+Total number of endpoints: 14
+Total number of used endpoints 5
+
+Total number of methods: 20
+Total number of methods used: 7
+
+TBA: Consider if total number of responses and parameters needed
+
+Total number of responses: TBA
+Total number of responses used: TBA
+
+Total number of parameters: TBA
+Total number of parameters used: TBA
+
+PASS/FAIL analysis TBA if needed
+Passed: TBA
+Coverage level given: TBA
+Endpoints excluded: TBA
+Failure reasons: TBA
+
+Endpoints:
+
+
+Endpoint: /pet
+    Usage count: 3
+    Methods count: 2
+    Methods used: 2
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: put
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 404
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 405
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 1
+                Unique values: 1
+                
+                    {"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":4,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:46:55.891+03:00', 'request': {'method': 'PUT', 'url': 'http://localhost/v3/pet', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Content-Type', 'value': 'application/json'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'Content-Length', 'value': '172'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'postData': {'mimeType': 'application/json', 'text': '{"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":4,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}', 'comment': ''}, 'headersSize': 366, 'bodySize': 172, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:46:56 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 12, 'wait': 670, 'receive': 27, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 711}
+            
+
+    
+        Type: post
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 405
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 2
+                Unique values: 1
+                
+                    {"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":9,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:47:17.886+03:00', 'request': {'method': 'POST', 'url': 'http://localhost/v3/pet', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Content-Type', 'value': 'application/json'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'Content-Length', 'value': '172'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'postData': {'mimeType': 'application/json', 'text': '{"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":9,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}', 'comment': ''}, 'headersSize': 367, 'bodySize': 172, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:47:17 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 22, 'receive': 2, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 25}
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:47:27.104+03:00', 'request': {'method': 'POST', 'url': 'http://localhost/v3/pet', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Content-Type', 'value': 'application/json'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'Content-Length', 'value': '172'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'postData': {'mimeType': 'application/json', 'text': '{"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":9,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}', 'comment': ''}, 'headersSize': 367, 'bodySize': 172, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:47:27 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 106, 'receive': 0, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 107}
+            
+
+    
+
+Endpoint: /pet/findByStatus
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: status
+                Location: query
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /pet/findByTags
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: tags
+                Location: query
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /pet/{petId}
+    Usage count: 3
+    Methods count: 3
+    Methods used: 2
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 1
+                Unique body values: 1
+                
+                    <Pet><id>9</id><category><id>6</id><name>name</name></category><name>doggie</name><photoUrl><photoUrl>photoUrls</photoUrl><photoUrl>photoUrls</photoUrl></photoUrl><tag><tag><id>1</id><name>name</name></tag><tag><id>1</id><name>name</name></tag></tag><status>available</status></Pet>
+                
+                Schema: TBA
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 404
+            
+                Usage count: 1
+                Unique body values: 1
+                
+                    <Map><timestamp>2019-04-21T13:48:24.566Z</timestamp><status>404</status><error>Not Found</error><message>Response status 404</message><path>/v3/pet/11</path></Map>
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: petId
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 2
+                Unique values: 2
+                
+                    9
+                
+                    11
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:47:57.168+03:00', 'request': {'method': 'GET', 'url': 'http://localhost/v3/pet/9', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': 'application/xml'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'headersSize': 301, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Type', 'value': 'application/xml;charset=UTF-8'}, {'name': 'Transfer-Encoding', 'value': 'chunked'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:47:57 GMT'}], 'content': {'size': 282, 'mimeType': 'application/xml;charset=UTF-8', 'text': '<Pet><id>9</id><category><id>6</id><name>name</name></category><name>doggie</name><photoUrl><photoUrl>photoUrls</photoUrl><photoUrl>photoUrls</photoUrl></photoUrl><tag><tag><id>1</id><name>name</name></tag><tag><id>1</id><name>name</name></tag></tag><status>available</status></Pet>', 'comment': ''}, 'redirectURL': '', 'headersSize': 129, 'bodySize': 282, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 9, 'wait': 128, 'receive': 5, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 143}
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:48:24.407+03:00', 'request': {'method': 'GET', 'url': 'http://localhost/v3/pet/11', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': 'application/xml'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'headersSize': 302, 'bodySize': 0, 'comment': ''}, 'response': {'status': 404, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Type', 'value': 'application/xml;charset=UTF-8'}, {'name': 'Transfer-Encoding', 'value': 'chunked'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:48:24 GMT'}], 'content': {'size': 163, 'mimeType': 'application/xml;charset=UTF-8', 'text': '<Map><timestamp>2019-04-21T13:48:24.566Z</timestamp><status>404</status><error>Not Found</error><message>Response status 404</message><path>/v3/pet/11</path></Map>', 'comment': ''}, 'redirectURL': '', 'headersSize': 129, 'bodySize': 163, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 170, 'receive': 1, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 172}
+            
+
+    
+        Type: post
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 405
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: petId
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+        Type: delete
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: api_key
+                Location: header
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+            Parameter name: petId
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 1
+                Unique values: 1
+                
+                    555
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:48:54.648+03:00', 'request': {'method': 'DELETE', 'url': 'http://localhost/v3/pet/555', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'headersSize': 320, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:48:54 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 13, 'wait': 98, 'receive': 0, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 112}
+            
+
+    
+
+Endpoint: /pet/{petId}/uploadImage
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: post
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: petId
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /store/inventory
+    Usage count: 1
+    Methods count: 1
+    Methods used: 1
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 1
+                Unique body values: 1
+                
+                    {"sold":1,"pending":2,"available":7}
+                
+                Schema: TBA
+            
+        Parameters:
+            
+        Anomalies:
+            
+
+        Logs:
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:49:49.736+03:00', 'request': {'method': 'GET', 'url': 'http://localhost/v3/store/inventory', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': 'application/json'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'headersSize': 312, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Type', 'value': 'application/json;charset=UTF-8'}, {'name': 'Transfer-Encoding', 'value': 'chunked'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:49:49 GMT'}], 'content': {'size': 36, 'mimeType': 'application/json;charset=UTF-8', 'text': '{"sold":1,"pending":2,"available":7}', 'comment': ''}, 'redirectURL': '', 'headersSize': 130, 'bodySize': 36, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 107, 'receive': 0, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 109}
+            
+
+    
+
+Endpoint: /store/order
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: post
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /store/order/{orderId}
+    Usage count: 1
+    Methods count: 2
+    Methods used: 1
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 1
+                Unique body values: 1
+                
+                    {"id":1,"petId":1,"quantity":2,"shipDate":"2019-04-21T13:21:23.269Z","status":"placed","complete":false}
+                
+                Schema: TBA
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 404
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: orderId
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 1
+                Unique values: 1
+                
+                    1
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:50:09.646+03:00', 'request': {'method': 'GET', 'url': 'http://localhost/v3/store/order/1', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': 'application/json'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'headersSize': 310, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Type', 'value': 'application/json;charset=UTF-8'}, {'name': 'Transfer-Encoding', 'value': 'chunked'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:50:09 GMT'}], 'content': {'size': 104, 'mimeType': 'application/json;charset=UTF-8', 'text': '{"id":1,"petId":1,"quantity":2,"shipDate":"2019-04-21T13:21:23.269Z","status":"placed","complete":false}', 'comment': ''}, 'redirectURL': '', 'headersSize': 130, 'bodySize': 104, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 146, 'receive': 8, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 155}
+            
+
+    
+        Type: delete
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 404
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: orderId
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /user
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: post
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Default response:
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /user/createWithArray
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: post
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Default response:
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /user/createWithList
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: post
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Default response:
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /user/login
+    Usage count: 3
+    Methods count: 1
+    Methods used: 1
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 3
+                Unique body values: 3
+                
+                    logged in user session:1555858271998
+                
+                    logged in user session:1555858260187
+                
+                    logged in user session:1555858254422
+                
+                Schema: TBA
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: username
+                Location: query
+                Required: True
+                Schema: TBA
+                Usage count: 3
+                Unique values: 2
+                
+                    d
+                
+                    dss
+                
+            
+            Parameter name: password
+                Location: query
+                Required: True
+                Schema: TBA
+                Usage count: 3
+                Unique values: 2
+                
+                    s
+                
+                    sss
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:50:54.304+03:00', 'request': {'method': 'GET', 'url': 'http://localhost/v3/user/login?username=d&password=s', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': 'application/xml'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [{'name': 'username', 'value': 'd'}, {'name': 'password', 'value': 's'}], 'headersSize': 328, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'X-Expires-After', 'value': 'Sun Apr 21 14:50:54 GMT 2019'}, {'name': 'X-Rate-Limit', 'value': '5000'}, {'name': 'Content-Type', 'value': 'application/xml;charset=UTF-8'}, {'name': 'Content-Length', 'value': '36'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:50:54 GMT'}], 'content': {'size': 36, 'mimeType': 'application/xml;charset=UTF-8', 'text': 'logged in user session:1555858254422', 'comment': ''}, 'redirectURL': '', 'headersSize': 188, 'bodySize': 36, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 127, 'receive': 0, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 128}
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:51:00.184+03:00', 'request': {'method': 'GET', 'url': 'http://localhost/v3/user/login?username=dss&password=sss', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': 'application/xml'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [{'name': 'username', 'value': 'dss'}, {'name': 'password', 'value': 'sss'}], 'headersSize': 332, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'X-Expires-After', 'value': 'Sun Apr 21 14:51:00 GMT 2019'}, {'name': 'X-Rate-Limit', 'value': '5000'}, {'name': 'Content-Type', 'value': 'application/xml;charset=UTF-8'}, {'name': 'Content-Length', 'value': '36'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:51:00 GMT'}], 'content': {'size': 36, 'mimeType': 'application/xml;charset=UTF-8', 'text': 'logged in user session:1555858260187', 'comment': ''}, 'redirectURL': '', 'headersSize': 188, 'bodySize': 36, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 5, 'wait': 0, 'receive': 0, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 7}
+            
+                {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:51:11.995+03:00', 'request': {'method': 'GET', 'url': 'http://localhost/v3/user/login?username=dss&password=sss', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': 'application/json'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [{'name': 'username', 'value': 'dss'}, {'name': 'password', 'value': 'sss'}], 'headersSize': 333, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'X-Expires-After', 'value': 'Sun Apr 21 14:51:11 GMT 2019'}, {'name': 'X-Rate-Limit', 'value': '5000'}, {'name': 'Content-Type', 'value': 'application/json;charset=UTF-8'}, {'name': 'Content-Length', 'value': '36'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:51:11 GMT'}], 'content': {'size': 36, 'mimeType': 'application/json;charset=UTF-8', 'text': 'logged in user session:1555858271998', 'comment': ''}, 'redirectURL': '', 'headersSize': 189, 'bodySize': 36, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 3, 'receive': 7, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 11}
+            
+
+    
+
+Endpoint: /user/logout
+    Usage count: 0
+    Methods count: 1
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Default response:
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+        Anomalies:
+            
+
+        Logs:
+            
+
+    
+
+Endpoint: /user/{username}
+    Usage count: 0
+    Methods count: 3
+    Methods used: 0
+    Response count and etc TBA:
+
+    Methods of endpoint:
+
+    
+        Type: get
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 200
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 404
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: username
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+        Type: put
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 404
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: username
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+            Parameter name: requestBody
+                Location: requestbody
+                Required: False
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    
+        Type: delete
+
+        Analysis of counts, responses, parameters, anomalies and everything TBA
+
+        Responses:
+            
+            
+            Response code: 400
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+            
+            Response code: 404
+            
+                Usage count: 0
+                Unique body values: 0
+                
+                Schema: TBA
+            
+        Parameters:
+            
+            Parameter name: username
+                Location: path
+                Required: True
+                Schema: TBA
+                Usage count: 0
+                Unique values: 0
+                
+            
+        Anomalies:
+            
+                Description: 
+                Entry: 
+            
+
+        Logs:
+            
+
+    

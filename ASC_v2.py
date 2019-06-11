@@ -652,6 +652,15 @@ class ASC:
         self.endpoints_count = 0
         self.endpoints_used = 0
 
+        # Common API info
+        self.open_api_version = "" # v2 or v3
+        self.api_name = "" # info object title
+        self.api_version = "" # info object version
+        self.api_description = "" # info object description, not required
+
+        # Common HAR info
+        self.first_entry_in_har_time = ""
+
     def read_har_file(self):
         # Initialize har parser object
         with open(self.har_addr, 'r') as f:
@@ -673,6 +682,14 @@ class ASC:
 
         self.apispec = specparser.specification
         paths = specparser.specification['paths']
+
+        info_object = specparser.specification['info']
+
+        self.api_name = info_object['title']
+        self.api_version = info_object['version']
+
+        if 'description' in info_object.keys():
+            self.api_description = info_object['description']
 
         # Parse endpoints
         for endpoint in paths.keys():
@@ -752,6 +769,9 @@ class ASC:
         # Classify and filter out har entries to correct endpoints to wait for analysis
 
         # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
+        # Also gets first and last time which api was touched (assuming that har file has increasing time order)
+
+        # TODO: Fetch start time of har file
         for page in self.harobject.pages:
             for entry in page.entries:
                 self.total_har_entries = self.total_har_entries + 1
@@ -927,8 +947,14 @@ class ASC:
     def get_all_report_data_as_dictionary(self):
 
         all_data_dictionary = {
+            'open_api_version': self.open_api_version,
+            'api_name': self.api_name,
+            'api_description': self.api_description,
+            'api_version': self.api_version,
+
             'total_api_usages': self.total_api_usages,
             'total_har_entries': self.total_har_entries,
+            'first_entry_in_har_time': self.first_entry_in_har_time,
             'analysis_initiation_time': self.analysis_initiated,
             'endpoints': [],
             'total_endpoints_count': self.endpoints_count,
@@ -968,29 +994,6 @@ class ASC:
         #   - Unique uses on all those etc
         #   - Anomaly listing and stuff
 
-        # Should it be made with like jinja raport?
-
-        # Make mockup data
-        common_info = {
-            'time_report_creation': 'asd',
-            'time_har_entries_start': 'qwe',
-            'time_har_entries_end': 'qweqwer',
-            'api_name': 'apiname',
-            'count_har_entries': 100,
-            'count_har_entries_touching_api': 50
-        }
-
-        coverage_info = {
-            'endpoints_total': 6,
-            'endpoints_covered': 5,
-            'methods_total': 12,
-            'methods_covered': 9,
-            'responses_total': 33,
-            'responses_covered': 15,
-            'parameters_total': 28,
-            'parameters_covered': 28
-        }
-
         all_data = self.get_all_report_data_as_dictionary()
 
         #print(json.dumps(self.get_all_report_data_as_dictionary(), sort_keys=True, indent=4))
@@ -1001,8 +1004,7 @@ class ASC:
 
         template = env.get_template('large_report.txt')
 
-        template.stream(common_info=common_info,
-                        data=all_data).dump('large_report_output.txt')
+        template.stream(data=all_data).dump('large_report_output.txt')
 
     def crash_program(self, suppress_crash=False):
         # Crash program with exit code 1 if needed and not suppressed
