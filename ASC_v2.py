@@ -38,6 +38,9 @@ class Endpoint:
         self.default_response_codes_in_methods_count = 0
         self.default_response_codes_in_methods_used = 0
 
+        # Make place for anomalies which do not fit into single method
+        self.anomalies = []
+
     def input_log_entry(self, entry):
         # Input entry under correct method
         method_type = entry['request']['method'].lower()
@@ -45,10 +48,16 @@ class Endpoint:
         if method_type in self.methods:
             self.methods[method_type].add_entry(entry)
             self.usage_count = self.usage_count + 1
-
-        # TODO: Should we react if endpoints wrong method is called?
-        # Technically discarding anything that does not call correct endpoint in spec is ok
-        # Technically it is anomalious act too
+        else:
+            # Endpoint method called which does not exist
+            # Make anomaly out of it
+            # Consider if this is futile and this could be discarded, because it is not "touching api"
+            # Not yet outputted to anywhere
+            self.anomalies.append(Anomaly(
+                entry=entry,
+                type=AnomalyType.UNDEFINED_METHOD_OF_ENDPOINT,
+                description=f"Call of undefined method {method_type} of the endpoint"
+            ))
 
     def match_url_to_path(self, url):
         '''
@@ -132,6 +141,7 @@ class Endpoint:
         return False
 
     def get_as_dictionary(self):
+        # TODO: add endpoint anomalies
         endpoint_dict = {
             'path': self.path,
             'usage_count': self.usage_count,
@@ -242,18 +252,13 @@ class SingleMethod:
         for entry in self.logs:
             url = entry['request']['url']
 
-            # TODO: How should lack of required parameter treated? It can be intentional in test and should not crash anything?
-
             for param in self.parameters:
                 if param.location == 'path':
                     # Use new utility function now
                     paramvalue = path_parameter_extractor(url, self.path, param.name)
 
-                    if paramvalue != "":
-                        param.add_usage(paramvalue)
-                    else:
-                        # TODO: Think if anomaly needs to be added to this
-                        pass
+                    # Path parameter can not be empty
+                    param.add_usage(paramvalue)
 
                 elif param.location == 'query':
                     # Check query parameters as default way
@@ -294,7 +299,8 @@ class SingleMethod:
                                             'name']) + " was not found in request header parameters"
                                     ))
 
-                elif param.location == 'body':
+                # Requestbody (OA V3) is treated as OA V2 body
+                elif param.location in ('body', 'requestbody'):
                     # Checks and validates body content of request and treats it as one parameter
                     # Openapi V3 does not have body parameter and it is replaced by 'requestBody' object
                     paramvalue = entry['request']['postData']['text']
@@ -305,6 +311,8 @@ class SingleMethod:
                     # TODO: Consider making anomalies here: Those can be futile because sent data can be broken purposefully
 
                     # TODO: Should here be broken body and violation of schema anomalies?
+
+                    # TODO: Make better except clauses
                     try:
                         ins = json.loads(paramvalue)
                     except:
@@ -313,13 +321,31 @@ class SingleMethod:
 
                         # Add anomaly
                         self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
-                                                                   "Could not parse sended data object in body to json object"))
+                                                                   "Could not parse sent data object in body to json object"))
 
                     else:
+                        # Select schema from options based on postdata mimetype
+                        postdata_mimetype = entry['request']['postData']['mimeType']
+                        #print(param.schemas.keys())
+                        #print(entry['request']['postData']['mimeType'])
+                        #print(param.schemas)
+
+                        sch = ""
+
+                        # Check if single schema is specified (OA v2)
+                        if param.schema is not None:
+                            sch = json.loads(json.dumps(param.schema))
+
+                        # Check if schema is found from set of multiple possible schemas by mimetype (OA v3)
+                        elif postdata_mimetype in param.schemas:
+                            sch = json.loads(json.dumps(param.schemas[postdata_mimetype]))
+
+                        else:
+                            # TODO: Consider what kind of exceptions could happend
+                            pass
+
+                        # TODO: Make more spesific except clauses
                         try:
-                            sch = json.loads(json.dumps(param['schema']))
-                            #print("validating instance")
-                            #print(ins)
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except:
                             self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
@@ -330,6 +356,7 @@ class SingleMethod:
                 elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR
                     # Parsing and analyzing data from there
+                    # TODO: add required parameter missing anomalies here
                     if 'params' in entry['request']['postData']:
                         for formparam in entry['request']['postData']['params']:
                             if formparam['name'] == param.name:
@@ -352,11 +379,14 @@ class SingleMethod:
                             # Data sended in parameter can be against api specification purposefully
                             # so making anomaly out of it may be most likely irrelevant
 
+                '''
                 # Requestbody (OA V3) is treated as like plain text body for now
+                # TODO: add same checks that body part has, this could actually be combined to body?
                 elif param.location == "requestbody":
                     # Requestbody is saved in text body in har file
                     body = entry['request']['postData']['text']
                     param.add_usage(body)
+                '''
 
             # Analyzing responses
             response_code = str(entry['response']['status'])
@@ -455,6 +485,7 @@ class AnomalyType(Enum):
     BROKEN_RESPONSE_BODY = 5
     DEFAULT_RESPONSE_IS_NOT_USED = 6 # Is this error at all?
     INVALID_RESPONSE_BODY = 7
+    UNDEFINED_METHOD_OF_ENDPOINT = 8
 
 
 class Anomaly:
@@ -476,12 +507,18 @@ class Anomaly:
 # TODO: should enum be added to location? yes, more formal to handle i guess
 # Should this be handling also requestbody?
 # Should parameter class be changed to "requestparameter" or "requestcontent"
+# Schemas could be dictionary of schemas...
 class Parameter:
-    def __init__(self, name, location, required=False, schema=None):
+    def __init__(self, name, location, required=False, schemas=None, schema=None):
         self.name = name
         self.location = location # path, query, body, formdata etc, should enum be made?
         self.required = required #Boolean, not yet used, could be futile because cannot know if request omits it purposefully
-        self.schema = schema #Schema, not yet used
+        #self.schema = schema #Schema, not yet used
+
+        # Use single schema with OA v2 and dictionary of multiple schemas with OA v3
+        self.schema = schema
+        self.schemas = schemas
+
         self.usage_count = 0
         self.unique_values = set()
 
@@ -498,7 +535,7 @@ class Parameter:
             'name': self.name,
             'location': self.location,
             'required': self.required,
-            'schema': self.schema,
+            'schemas': self.schemas,
             'usage_count': self.usage_count,
             'unique_values': list(self.unique_values),
             'unique_values_count': self.get_unique_usage_count()
@@ -621,7 +658,7 @@ class ASC:
         # Parse endpoints
         for endpoint in paths.keys():
             # Parse endpoint specific parameters if those exist
-
+            # TODO: Need to think how schemas are appended here
             params_endpoint = []
             if 'parameters' in paths[endpoint].keys():
                 # Common parameters for endpoint exists
@@ -645,10 +682,22 @@ class ASC:
                     # Common parameters for endpoint exists
                     for param in paths[endpoint][method]['parameters']:
                         param_required = False
+
+                        # Use schemas for OA v3 and schema for OA v2
+                        schema = None
                         if 'required' in param:
                             param_required = param['required']
 
-                        params_operation.append(Parameter(param['name'], param['in'], required=param_required))
+                        # OA V2 only 1 schema available and parameter is always in body
+
+                        # Parameter can have only one schema
+
+                        if 'schema' in param:
+                            schema = param['schema']
+
+                        params_operation.append(Parameter(param['name'], param['in'],
+                                                          required=param_required,
+                                                          schema=schema))
 
                 # Responses
                 # TODO: Consider if this should be changed to dict of responses (otherwise same, key as response code)
@@ -671,7 +720,14 @@ class ASC:
                 if 'requestBody' in paths[endpoint][method].keys():
                     # OA V3
                     # TODO: consider how to apply schemas in this and think requestbody things
-                    params_operation.append(Parameter('requestBody', 'requestbody'))
+
+                    # Collect schemas
+                    schemas = {}
+                    for media_type, media_object in paths[endpoint][method]['requestBody']['content'].items():
+                        if 'schema' in media_object:
+                            schemas[media_type] = media_object['schema']
+
+                    params_operation.append(Parameter('requestBody', 'requestbody', schemas=schemas))
 
                 # Add here only params which are not duplicate (overriden endpoint params are dropped)
                 params_final = []
