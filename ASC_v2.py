@@ -5,6 +5,7 @@ import argparse
 import copy
 from jsonschema import validate
 from jsonschema import validators
+from jsonschema import ValidationError
 
 from urllib.parse import urlparse
 
@@ -311,23 +312,17 @@ class SingleMethod:
 
                     # TODO: Possibly new feature to check and handle single schema fields as parameters if needed
 
-                    # TODO: Make better except clauses
                     try:
                         ins = json.loads(paramvalue)
-                    except:
-                        # Notify
-                        print("Cannot parse request parameters")
-
+                    except json.JSONDecodeError as e:
                         # Add anomaly
                         self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
-                                                                   "Could not parse sent data object in body to json object"))
+                                                            "Could not parse sent data object in body to json object." +
+                                                            f"Error message: {str(e)}"))
 
                     else:
                         # Select schema from options based on postdata mimetype
                         postdata_mimetype = entry['request']['postData']['mimeType']
-                        #print(param.schemas.keys())
-                        #print(entry['request']['postData']['mimeType'])
-                        #print(param.schemas)
 
                         sch = ""
 
@@ -343,14 +338,13 @@ class SingleMethod:
                             # TODO: Consider what kind of exceptions could happend
                             pass
 
-                        # TODO: Make more spesific except clauses
                         try:
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                        except:
+                        except ValidationError as e:
                             self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
-                                                                       "Validator produced error when validating this request body"))
-
-                    pass
+                                                                       "Validator produced error when validating this request body" +
+                                                                        f"Error {str(e)}"
+                                                          ))
 
                 elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR
