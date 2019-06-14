@@ -41,6 +41,9 @@ class Endpoint:
         # Make place for anomalies which do not fit into single method
         self.anomalies = []
 
+        # TODO: Think if endpoint specific parameters must be handled differently
+        # Currently they are dropped to operation level (singlemethod) when parsing
+
     def input_log_entry(self, entry):
         # Input entry under correct method
         method_type = entry['request']['method'].lower()
@@ -70,6 +73,8 @@ class Endpoint:
         url_parsed = urlparse(url)
 
         # TODO: Consider giving endpoint also server name and other stuff to filter out some weird ulrs
+
+        # TODO: Consider need of basepath and server because OA v3 can have multiple servers too
 
         # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
@@ -141,13 +146,13 @@ class Endpoint:
         return False
 
     def get_as_dictionary(self):
-        # TODO: add endpoint anomalies
         endpoint_dict = {
             'path': self.path,
             'usage_count': self.usage_count,
             'methods_count': self.methods_count,
             'methods_used': self.methods_used,
-            'methods': {}
+            'methods': {},
+            'anomalies': self.anomalies
         }
         for method_type in self.methods.keys():
             endpoint_dict['methods'][method_type] = self.methods[method_type].get_as_dictionary()
@@ -276,8 +281,7 @@ class SingleMethod:
                         # Anomaly because of required parameter is not found
                         self.anomalies.append(Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
                                                                "Required parameter " + str(
-                                                                   param[
-                                                                       'name']) + " was not found in request query parameters"
+                                                                   param.name) + " was not found in request query parameters"
                                                       ))
 
                 elif param.location == 'header':
@@ -295,8 +299,7 @@ class SingleMethod:
                         self.anomalies.append(
                             Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
                                     "Required parameter " + str(
-                                        param[
-                                            'name']) + " was not found in request header parameters"
+                                        param.name) + " was not found in request header parameters"
                                     ))
 
                 # Requestbody (OA V3) is treated as OA V2 body
@@ -307,10 +310,6 @@ class SingleMethod:
                     param.add_usage(paramvalue)
 
                     # TODO: Possibly new feature to check and handle single schema fields as parameters if needed
-
-                    # TODO: Consider making anomalies here: Those can be futile because sent data can be broken purposefully
-
-                    # TODO: Should here be broken body and violation of schema anomalies?
 
                     # TODO: Make better except clauses
                     try:
@@ -356,37 +355,45 @@ class SingleMethod:
                 elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR
                     # Parsing and analyzing data from there
-                    # TODO: add required parameter missing anomalies here
+
                     if 'params' in entry['request']['postData']:
+                        parameter_found = False
                         for formparam in entry['request']['postData']['params']:
                             if formparam['name'] == param.name:
                                 paramvalue = formparam['value']
                                 param.add_usage(paramvalue)
+                                parameter_found = True
 
-                            # Data sended in parameter can be against api specification purposefully
-                            # so making anomaly out of it may be most likely irrelevant
+                        if not parameter_found and param.required:
+                            # Make required parameter not found anomaly
+                            self.anomalies.append(
+                                Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                        "Required parameter " + str(
+                                            param.name) + " was not found in request form data"
+                                        ))
 
                     elif 'text' in entry['request']['postData']:
                         # Form parameters can be found in text field of HAR too, which case special parsing is required
                         # Parse multipart data from response with custom functions
+
+                        # TODO: getting boundary and parsed data are so tightly connected that consider combining
+                        # could be used some ready multipart decoder?
                         bound = get_multipart_boundary(entry['request'])
                         parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
 
+                        parameter_found = False
                         for p_name, paramvalue in parseddata:
                             if p_name == param.name:
                                 param.add_usage(paramvalue)
+                                parameter_found = True
 
-                            # Data sended in parameter can be against api specification purposefully
-                            # so making anomaly out of it may be most likely irrelevant
-
-                '''
-                # Requestbody (OA V3) is treated as like plain text body for now
-                # TODO: add same checks that body part has, this could actually be combined to body?
-                elif param.location == "requestbody":
-                    # Requestbody is saved in text body in har file
-                    body = entry['request']['postData']['text']
-                    param.add_usage(body)
-                '''
+                        if not parameter_found and param.required:
+                            # Make required parameter not found anomaly
+                            self.anomalies.append(
+                                Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                        "Required parameter " + str(
+                                            param.name) + " was not found in request form data"
+                                        ))
 
             # Analyzing responses
             response_code = str(entry['response']['status'])
@@ -752,9 +759,7 @@ class ASC:
         # Classify and filter out har entries to correct endpoints to wait for analysis
 
         # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
-        # Also gets first and last time which api was touched (assuming that har file has increasing time order)
 
-        # TODO: Fetch start time of har file
         for page in self.harobject.pages:
             for entry in page.entries:
                 self.total_har_entries = self.total_har_entries + 1
@@ -767,6 +772,7 @@ class ASC:
                         self.total_api_usages = self.total_api_usages + 1
                         break
 
+                # TODO: Consider if this should be saved too to final reporting?
                 if not endpoint_found:
                     print(f"HAR entry URL {url} does not correspond any endpoint in API specification")
 
@@ -796,7 +802,13 @@ class ASC:
         # Get calculated data as basic dictionary form and output it sensibly to console
         data = self.get_all_report_data_as_dictionary()
 
-        # TODO: Add some common information printing before printing endpoints
+        print("Common info")
+        print(f"OpenAPI version {data['open_api_version']}")
+        print(f"API name: {data['api_name']}")
+        print(f"API description: {data['api_description']}")
+        print(f"API version: {data['api_version']}")
+
+        print(f"Total API usages: {data['total_api_usages']}")
 
         for endpoint in data['endpoints']:
             print(TerminalColors.HEADER + f"Endpoint {endpoint['path']}" + TerminalColors.ENDC)
@@ -1009,26 +1021,9 @@ class ASC:
         return all_data_dictionary
 
     def export_large_report_text(self):
-        # TODO: Create full report, all data, all anomalies, should not be affected by setups (some exceptions)
-
-        # Structure of large report
-        # First must be overview data
-        #   - Total requests, total requests on api
-        #   - Percentages and numbers on everything
-        #       - Number and percentage of endpoints covered (mention excluded)
-        #       - Number and percentage of methods covered (mention exluced)
-        #       - Number and percentage of responses covered (mention exluced)
-        #       - Number and percentage of parameters covered (mention exluced)
-        #   - Point of failures
-        #       - Well, not actually needed, failure raport exists and this should not depend on cov level, and stuff isindicated already
-        # Rest should concentrate individual endpoit/method analysis as list
-        #   - Total usage number on parameters, responses and method etc
-        #   - Unique uses on all those etc
-        #   - Anomaly listing and stuff
-
         all_data = self.get_all_report_data_as_dictionary()
 
-        #print(json.dumps(self.get_all_report_data_as_dictionary(), sort_keys=True, indent=4))
+        # print(json.dumps(self.get_all_report_data_as_dictionary(), sort_keys=True, indent=4))
 
         env = Environment(
             loader=FileSystemLoader('Templates/')
@@ -1050,6 +1045,8 @@ class ASC:
 
 
 def main():
+    # TODO: Add anomaly type exclusion to command line parameters
+
     failurereportname = "failure_report.txt"
     anomalyreportname = "anomaly_report.txt"
 
