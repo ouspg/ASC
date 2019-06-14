@@ -21,7 +21,7 @@ def get_multipart_boundary(req_entry):
             return boundvalue
 
 
-# TODO: Improve readibility
+# TODO: Improve readibility and write exhaustive testing and inspect multipart decoder to make your own
 def decode_multipart(text, boundary):
     # Returns array of tuple name-value pairs
     splitted_text = text.split(boundary)

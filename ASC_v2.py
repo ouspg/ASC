@@ -17,6 +17,8 @@ from jinja2 import Environment, FileSystemLoader
 
 import time
 
+from requests_toolbelt.multipart import decoder
+
 from utils import TerminalColors, get_multipart_boundary, decode_multipart, path_parameter_extractor
 
 
@@ -371,7 +373,7 @@ class SingleMethod:
                         # Parse multipart data from response with custom functions
 
                         # TODO: getting boundary and parsed data are so tightly connected that consider combining
-                        # could be used some ready multipart decoder?
+                        # Have to make own decoder because requests_toolbelt.MultipartDecoder does not work!
                         bound = get_multipart_boundary(entry['request'])
                         parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
 
@@ -390,6 +392,7 @@ class SingleMethod:
                                         ))
 
             # Analyzing responses
+            # TODO: Add oa v3 multiple schema possibility
             response_code = str(entry['response']['status'])
             response_code_found = False
             for resp in self.responses:
@@ -398,19 +401,23 @@ class SingleMethod:
                     resp.add_usage(entry['response']['content']['text'])
 
                     # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
-                    # Now xml bodies are just skipped
+                    # Now xml bodies produce JSON parsing error
 
                     # If response has schema specified, compare response body content with it
 
-                    # Transfer this to correspond new objects
                     if resp.schema is not None:
                         sch = json.loads(json.dumps(resp.schema))
                         # Try parse and validate
                         try:
                             ins = json.loads(entry['response']['content']['text'])
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                        except Exception as e:
-                            #print(str(e))
+                        except json.decoder.JSONDecodeError as e:
+                            self.anomalies.append(
+                                Anomaly(entry,
+                                        AnomalyType.INVALID_RESPONSE_BODY,
+                                        f"JSON parsing error when parsing response body. Error message:{str(e)}"))
+
+                        except ValidationError as e:
                             self.anomalies.append(
                                 Anomaly(entry,
                                           AnomalyType.INVALID_RESPONSE_BODY,
@@ -423,8 +430,6 @@ class SingleMethod:
                 # Decide if default response is present and make anomaly text based on it
 
                 # TODO: Closer inspection on default schemas and stuff needed
-
-                # TODO: add to anomalies like: error produced by xxx validator
 
                 default_response_exists = False
                 for resp in self.responses:
@@ -440,11 +445,18 @@ class SingleMethod:
                             try:
                                 ins = json.loads(entry['response']['content']['text'])
                                 validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                            except Exception as e:
+
+                            except json.decoder.JSONDecodeError as e:
                                 self.anomalies.append(
                                     Anomaly(entry,
                                             AnomalyType.INVALID_RESPONSE_BODY,
-                                            "Validator produced validation error when validating default response body. Error message:{str(e)}"))
+                                            f"JSON parsing error when parsing response body. Error message:{str(e)}"))
+
+                            except ValidationError as e:
+                                self.anomalies.append(
+                                    Anomaly(entry,
+                                            AnomalyType.INVALID_RESPONSE_BODY,
+                                            f"Validator produced validation error when validating default response body. Error message:{str(e)}"))
 
                         break
 
