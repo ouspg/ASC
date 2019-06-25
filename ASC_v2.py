@@ -44,8 +44,9 @@ class Endpoint:
         # Make place for anomalies which do not fit into single method
         self.anomalies = []
 
-        # TODO: Think if endpoint specific parameters must be handled differently
-        # Currently they are dropped to operation level (singlemethod) when parsing
+        # Currently endpoint level parameters are dropped to operation level (singlemethod) during parsing
+        # Operation level can override endpoint parameters, so it feels locically to handle those always there
+        # Endpoint should be coded to handle them too if necessary
 
     def input_log_entry(self, entry):
         # Input entry under correct method
@@ -193,6 +194,8 @@ class SingleMethod:
 
         self.default_response_used = False
 
+        self.parameters_used = 0
+
     def add_entry(self, entry):
         # Add single entry to list
         self.logs.append(entry)
@@ -229,7 +232,9 @@ class SingleMethod:
             'response_codes_used': self.response_codes_used,
             'default_response_exists': self.default_response_exists,
             'default_response_used': self.default_response_used,
-            'anomalies_count': 0
+            'anomalies_count': 0,
+            'parameters_used': self.parameters_used,
+            'parameters_count': len(self.parameters)
         }
 
         params = []
@@ -479,7 +484,9 @@ class SingleMethod:
                 if r.usage_count != 0:
                     self.default_response_used = True
 
-        # TODO: Same as above with params
+        for p in self.parameters:
+            if p.usage_count > 0:
+                self.parameters_used += 1
 
 
 class Schema:
@@ -510,7 +517,7 @@ class Anomaly:
     def get_as_dictionary(self):
         anomaly_dictionary = {
             'entry': self.entry,
-            'type': self.type,
+            'type': self.type.value,
             'description': self.description
         }
 
@@ -638,6 +645,9 @@ class ASC:
         # Common HAR info
         self.first_entry_in_har_time = ""
 
+        # Request URLs which were filtered out during preprocessing
+        self.har_filtered_out_request_urls = []
+
     def read_har_file(self):
         # Initialize har parser object
         with open(self.har_addr, 'r') as f:
@@ -742,6 +752,8 @@ class ASC:
 
                     params_operation.append(Parameter('requestBody', 'requestbody', schemas=schemas))
 
+                # Endpoint parameters are parsed to operation level (singlemethod)
+
                 # Add here only params which are not duplicate (overriden endpoint params are dropped)
                 params_final = []
 
@@ -778,9 +790,10 @@ class ASC:
                         self.total_api_usages = self.total_api_usages + 1
                         break
 
-                # TODO: Consider if this should be saved too to final reporting?
+                # Print notification and add url to list of filtered out urls
                 if not endpoint_found:
                     print(f"HAR entry URL {url} does not correspond any endpoint in API specification")
+                    self.har_filtered_out_request_urls.append(url)
 
     def analyze(self):
         # Trigger every endppoint analysis
@@ -867,16 +880,14 @@ class ASC:
                         print(anomaly['description'])
                         print(anomaly['entry'])
 
-    def export_large_report_json(self):
+    def export_large_report_json(self, filename):
         # Exports json report
-        # Collect all dictionaries of endpoints and output them in raport
+        # Currently just dumping that output dictionary to json file
+        # Consider making json schema of report if needed
+        all_data = self.get_all_report_data_as_dictionary()
 
-        # TODO: Determine proper json format and output as file, is schema needed?
-        for endpoint in self.endpoints.keys():
-            for method in self.endpoints[endpoint].methods.keys():
-                pass
-                #analysis result does not exist anymore
-                #print(self.endpoints[endpoint].methods[method].analysis_result)
+        with open(filename, 'w') as f:
+            json.dump(all_data, f)
 
     def analyze_coverage(self):
         '''
@@ -968,6 +979,8 @@ class ASC:
         self.coverage_requirement_passed = coverage_level_achieved
 
         # TODO: Actual schema instead of simple text file or stuff?
+        # Should failure raport follow cleaner template if anomalies can make failures too?
+        # Or should failure report be kept as simple as possible?
 
         with open(failure_report_filename, 'w') as file:
             for fail in failures:
@@ -980,6 +993,7 @@ class ASC:
         Anomalies categorized under each endpoint and type
         :return:
         '''
+        # TODO: Should anomaly report also utilize templating?
         # TODO: Is it sensible to use anomaly type as only numeric enum
         with open(anomaly_report_filename, 'w') as file:
 
@@ -1005,6 +1019,7 @@ class ASC:
             'total_api_usages': self.total_api_usages,
             'total_har_entries': self.total_har_entries,
             'first_entry_in_har_time': self.first_entry_in_har_time,
+            'har_filtered_out_request_urls': self.har_filtered_out_request_urls,
             'analysis_initiation_time': self.analysis_initiated,
             'endpoints': [],
             'total_endpoints_count': self.endpoints_count,
@@ -1026,7 +1041,7 @@ class ASC:
 
         return all_data_dictionary
 
-    def export_large_report_text(self):
+    def export_large_report_text(self, filename):
         all_data = self.get_all_report_data_as_dictionary()
 
         # print(json.dumps(self.get_all_report_data_as_dictionary(), sort_keys=True, indent=4))
@@ -1037,7 +1052,7 @@ class ASC:
 
         template = env.get_template('large_report.txt')
 
-        template.stream(data=all_data).dump('large_report_output.txt')
+        template.stream(data=all_data).dump(filename)
 
     def crash_program(self, suppress_crash=False):
         # Crash program with exit code 1 if needed and not suppressed
@@ -1056,12 +1071,19 @@ def main():
     failurereportname = "failure_report.txt"
     anomalyreportname = "anomaly_report.txt"
 
+    large_report_text_filename = "large_report_text.txt"
+    large_report_json_filename = "large_report_json.json"
+
     parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
     parser.add_argument('apispec', help='Api specification file')
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
     parser.add_argument('failurereportname', nargs="?", type=str, default=failurereportname, help=f"Name of failure report, if not given default is {failurereportname}. If similar named file exist, it will be overwritten.")
     parser.add_argument('anomalyreportname', nargs="?", type=str, default=anomalyreportname,
                         help=f"Name of failure report, if not given default is {anomalyreportname}. If similar named file exist, it will be overwritten.")
+    parser.add_argument('largereporttext', nargs="?", type=str, default=large_report_text_filename, help=f"Name of large textual report, if not given default is {large_report_text_filename}. If similar named file exist, it will be overwritten.")
+    parser.add_argument('largereportjson', nargs="?", type=str, default=large_report_json_filename,
+                        help=f"Name of large textual report, if not given default is {large_report_json_filename}. If similar named file exist, it will be overwritten.")
+
     parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. full coverage expected always on next things. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
     parser.add_argument('--parametercoveragelevel', help='Specify parameter coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 1 = require parameter to be used at least once, 2 = require parameter to be used with 2 unique values')
     parser.add_argument('--exclude', nargs='+', type=str, default=[], help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
@@ -1081,7 +1103,8 @@ def main():
     asc.print_analysis_to_console(False)
     asc.export_failure_report(args.failurereportname)
     asc.export_anomaly_report(args.anomalyreportname)
-    asc.export_large_report_text()
+    asc.export_large_report_text(args.largereporttext)
+    asc.export_large_report_json(args.largereportjson)
     asc.crash_program(suppress_crash=args.dontcrashincoveragefailure)
 
 
