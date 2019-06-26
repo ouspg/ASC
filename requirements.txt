@@ -18,3 +18,4 @@ six==1.12.0
 swagger-parser==1.0.1
 swagger-spec-validator==2.4.3
 urllib3==1.24.3
+argparse-utils==1.2.0
