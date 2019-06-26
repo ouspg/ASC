@@ -2,6 +2,7 @@ import json
 from haralyzer import HarParser, HarPage
 import re
 import argparse
+from argparse_utils import enum_action
 import copy
 from jsonschema import validate
 from jsonschema import validators
@@ -59,7 +60,7 @@ class Endpoint:
             # Endpoint method called which does not exist
             # Make anomaly out of it
             # Consider if this is futile and this could be discarded, because it is not "touching api"
-            # Not yet outputted to anywhere
+            # TODO: Not yet outputted to anywhere, make report output
             self.anomalies.append(Anomaly(
                 entry=entry,
                 type=AnomalyType.UNDEFINED_METHOD_OF_ENDPOINT,
@@ -471,7 +472,7 @@ class SingleMethod:
 
                 else:
                     self.anomalies.append(
-                        Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
+                        Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_NOT_SPECIFIED,
                                 "Response code " + str(
                                     response_code) + " is not explictly defined in API specification, and default response is not present"))
 
@@ -595,7 +596,7 @@ class Response:
 
 class ASC:
     def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0,
-                 parameter_coverage_level_required=0):
+                 parameter_coverage_level_required=0, anomaly_types_causing_crash=[]):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
 
@@ -616,6 +617,9 @@ class ASC:
 
         # Set passing of coverage initially true and later analysis can change it to false
         self.coverage_requirement_passed = True
+
+        # Critical anomaly encountered
+        self.anomaly_requirements_passed = True
 
         self.total_api_usages = 0
         self.total_har_entries = 0
@@ -647,6 +651,10 @@ class ASC:
 
         # Request URLs which were filtered out during preprocessing
         self.har_filtered_out_request_urls = []
+
+        # Anomaly types, which will cause the crash of program
+        # Should those be called critical anomalies?
+        self.anomaly_types_causing_crash = anomaly_types_causing_crash
 
     def read_har_file(self):
         # Initialize har parser object
@@ -965,12 +973,12 @@ class ASC:
 
         return coverage_level_fulfilled, coverage_level_failure_reasons
 
-    def export_failure_report(self, failure_report_filename):
+    def analyze_and_export_coverage_failure_report(self, failure_report_filename):
         '''
-        Saves the failure report to file named filename
-        Name of the file is not specified by command line args asc_failure_report_timestamp
+        Saves the failure report to specified filename
+        Name of the file is specified by command line arg failurereportname
         Overwrites file if same name exists
-        Creates empty file if no failures exist
+        Creates empty file if no failure report exist
         :return:
         '''
 
@@ -979,29 +987,43 @@ class ASC:
         self.coverage_requirement_passed = coverage_level_achieved
 
         # TODO: Actual schema instead of simple text file or stuff?
-        # Should failure raport follow cleaner template if anomalies can make failures too?
+        # Should failure report follow cleaner template if anomalies can make failures too?
         # Or should failure report be kept as simple as possible?
 
         with open(failure_report_filename, 'w') as file:
             for fail in failures:
                 file.write(fail + "\n")
 
-    def export_anomaly_report(self, anomaly_report_filename):
+    def analyze_and_export_anomaly_report(self, anomaly_report_filename, critical_anomaly_report_filename):
         '''
         :param anomaly_report_filename:
         Creates report listing only anomalies
         Anomalies categorized under each endpoint and type
+        If crashing anomaly is found, write those to separate file and crash the program later
         :return:
         '''
         # TODO: Should anomaly report also utilize templating?
         # TODO: Is it sensible to use anomaly type as only numeric enum
+
+
+        # For now run through everything twice
+        with open(critical_anomaly_report_filename, 'w') as file:
+            for endpoint in self.endpoints.keys():
+                for method in self.endpoints[endpoint].methods.keys():
+                    for anomaly in self.endpoints[endpoint].methods[method].anomalies:
+                        if anomaly.type in self.anomaly_types_causing_crash:
+                            # Critical failure anomaly encountered
+                            file.write(anomaly.description + "\n")
+                            file.write(str(anomaly.entry) + "\n")
+                            self.anomaly_requirements_passed = False
+
         with open(anomaly_report_filename, 'w') as file:
 
             for endpoint in self.endpoints.keys():
                 for method in self.endpoints[endpoint].methods.keys():
                     header = f"Endpoint {endpoint} - method {method.upper()} \n"
                     file.write(header)
-                    # TODO: do sorting
+                    # TODO: Consider doing sorting, subheadering, templating
                     # TODO: subheadering
                     for anomaly in self.endpoints[endpoint].methods[method].anomalies:
                         #print(anomaly)
@@ -1060,16 +1082,16 @@ class ASC:
         if suppress_crash:
             return
 
-        if not self.coverage_requirement_passed:
+        if not self.coverage_requirement_passed or not self.anomaly_requirements_passed:
             # Crash program
             exit(1)
 
 
 def main():
-    # TODO: Add anomaly type exclusion to command line parameters
-
-    failurereportname = "failure_report.txt"
+    coveragefailurereportname = "coverage_failure_report.txt"
     anomalyreportname = "anomaly_report.txt"
+
+    anomalyfailurereportname = "anomaly_failure_report.txt"
 
     large_report_text_filename = "large_report_text.txt"
     large_report_json_filename = "large_report_json.json"
@@ -1077,7 +1099,7 @@ def main():
     parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
     parser.add_argument('apispec', help='Api specification file')
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
-    parser.add_argument('failurereportname', nargs="?", type=str, default=failurereportname, help=f"Name of failure report, if not given default is {failurereportname}. If similar named file exist, it will be overwritten.")
+    parser.add_argument('failurereportname', nargs="?", type=str, default=coveragefailurereportname, help=f"Name of failure report, if not given default is {coveragefailurereportname}. If similar named file exist, it will be overwritten.")
     parser.add_argument('anomalyreportname', nargs="?", type=str, default=anomalyreportname,
                         help=f"Name of failure report, if not given default is {anomalyreportname}. If similar named file exist, it will be overwritten.")
     parser.add_argument('largereporttext', nargs="?", type=str, default=large_report_text_filename, help=f"Name of large textual report, if not given default is {large_report_text_filename}. If similar named file exist, it will be overwritten.")
@@ -1086,26 +1108,29 @@ def main():
 
     parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. full coverage expected always on next things. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
     parser.add_argument('--parametercoveragelevel', help='Specify parameter coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 1 = require parameter to be used at least once, 2 = require parameter to be used with 2 unique values')
+    parser.add_argument('--anomaliestocausefailure', nargs='+', action=enum_action(AnomalyType), help='List anomaly names which occurrence will cause program to crash')
+    parser.add_argument('--anomalyfailurereportname',  nargs="?", type=str, default=anomalyfailurereportname,
+                        help=f"Name of anomaly failure report, if not given default is {anomalyfailurereportname}. If similar named file exist, it will be overwritten.")
+
     parser.add_argument('--exclude', nargs='+', type=str, default=[], help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
     parser.add_argument('--suppressconsole', help="Suppress console outputs", action='store_true')
     parser.add_argument('--suppressconsoleanomalies', help="Suppress listing of full anomalies in console output", action='store_true')
-    parser.add_argument('--dontcrashincoveragefailure', action='store_true', help="Do not crash program in the end if coverage level is not fullfilled")
+    parser.add_argument('--dontcrashinfailures', action='store_true', help="Do not crash program in the end even if coverage level or critical anomaly would cause crash")
 
     args = parser.parse_args()
-
     asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude,
-              parameter_coverage_level_required=args.parametercoveragelevel)
+              parameter_coverage_level_required=args.parametercoveragelevel, anomaly_types_causing_crash=args.anomaliestocausefailure)
 
     asc.read_api_specification()
     asc.read_har_file()
     asc.preprocess_har_entries()
     asc.analyze()
-    asc.print_analysis_to_console(False)
-    asc.export_failure_report(args.failurereportname)
-    asc.export_anomaly_report(args.anomalyreportname)
+    asc.print_analysis_to_console(args.suppressconsoleanomalies)
+    asc.analyze_and_export_coverage_failure_report(args.failurereportname)
+    asc.analyze_and_export_anomaly_report(args.anomalyreportname, args.anomalyfailurereportname)
     asc.export_large_report_text(args.largereporttext)
     asc.export_large_report_json(args.largereportjson)
-    asc.crash_program(suppress_crash=args.dontcrashincoveragefailure)
+    asc.crash_program(suppress_crash=args.dontcrashinfailures)
 
 
 if __name__ == '__main__':
