@@ -525,7 +525,7 @@ class Anomaly:
         return anomaly_dictionary
 
 
-# TODO: should enum be added to location? yes, more formal to handle i guess
+# TODO: Consider making location to be enum if needed
 # Should this be handling also requestbody?
 # Should parameter class be changed to "requestparameter" or "requestcontent"
 # Schemas could be dictionary of schemas...
@@ -986,10 +986,7 @@ class ASC:
 
         self.coverage_requirement_passed = coverage_level_achieved
 
-        # TODO: Actual schema instead of simple text file or stuff?
-        # Should failure report follow cleaner template if anomalies can make failures too?
-        # Or should failure report be kept as simple as possible?
-
+        # Keeping failure report as minimal as possible for now
         with open(failure_report_filename, 'w') as file:
             for fail in failures:
                 file.write(fail + "\n")
