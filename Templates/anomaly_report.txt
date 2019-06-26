@@ -1,0 +1,17 @@
+ASC - Anomaly report
+
+Anomalies ordered by category:
+
+{% for anomaly_tuple in anomalies_sorted_by_category %}
+Endpoint: {{anomaly_tuple[1]}}
+Description: {{anomaly_tuple[0].description}}
+Entry: {{anomaly_tuple[0].entry}}
+{% endfor %}
+
+Anomalies ordered by endpoint:
+
+{% for anomaly_tuple in anomalies_sorted_by_endpoint %}
+Endpoint: {{anomaly_tuple[1]}}
+Description: {{anomaly_tuple[0].description}}
+Entry: {{anomaly_tuple[0].entry}}
+{% endfor %}
