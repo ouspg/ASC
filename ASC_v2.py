@@ -18,6 +18,8 @@ from jinja2 import Environment, FileSystemLoader
 
 import time
 
+import configparser
+
 from requests_toolbelt.multipart import decoder
 
 from utils import TerminalColors, get_multipart_boundary, decode_multipart, path_parameter_extractor
@@ -537,6 +539,7 @@ class Parameter:
         #self.schema = schema #Schema, not yet used
 
         # Use single schema with OA v2 and dictionary of multiple schemas with OA v3
+        # Schemas used only when location is requestbody
         self.schema = schema
         self.schemas = schemas
 
@@ -594,9 +597,23 @@ class Response:
         return response_dictionary
 
 
+# Or should name be api coverage level and names be coverage_endpoint
+class ApiCoverageLevel(Enum):
+    COVERAGE_DISABLED = 0
+    COVERAGE_ENDPOINT = 1
+    COVERAGE_METHOD = 2
+    COVERAGE_RESPONSE = 3
+
+
+class ParameterCoverageLevel(Enum):
+    COVERAGE_DISABLED = 1
+    COVERAGE_USED_ONCE = 2
+    COVERAGE_USED_TWICE_UNIQUELY = 3
+
+
 class ASC:
-    def __init__(self, apispec_addr, har_addr, endpoints_excluded=[], coverage_level_required=0,
-                 parameter_coverage_level_required=0, anomaly_types_causing_crash=[]):
+    def __init__(self, apispec_addr, har_addr, endpoints_excluded, coverage_level_required,
+                 parameter_coverage_level_required, anomaly_types_causing_crash):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
 
@@ -690,6 +707,7 @@ class ASC:
         for endpoint in paths.keys():
             # Parse endpoint specific parameters if those exist
             # TODO: Need to think how schemas are appended here
+            # Both oa specses seems to have their respective parameters there parameters there
             params_endpoint = []
             if 'parameters' in paths[endpoint].keys():
                 # Common parameters for endpoint exists
@@ -698,7 +716,11 @@ class ASC:
                     if 'required' in param:
                         param_required = param['required']
 
-                    params_endpoint.append(Parameter(param['name'], param['in'], required=param_required))
+                    schema = None
+                    if 'schema' in param:
+                        schema = param['schema']
+
+                    params_endpoint.append(Parameter(param['name'], param['in'], required=param_required, schema=schema))
 
             mthds = {}
 
@@ -723,6 +745,7 @@ class ASC:
 
                         # Parameter can have only one schema
 
+                        schema = None
                         if 'schema' in param:
                             schema = param['schema']
 
@@ -786,6 +809,7 @@ class ASC:
 
         # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
 
+        # TODO: Determine if some calculation efficiency can be achieved by pre-filtering "pages"
         for page in self.harobject.pages:
             for entry in page.entries:
                 self.total_har_entries = self.total_har_entries + 1
@@ -904,17 +928,14 @@ class ASC:
         If failures exist, return true, otherwise false in order to main function to crash program
         :return:
         '''
-        # TODO: If 'treat undefined response as error' flag or something is specified, add it here accordingly
-        # TODO: Does it make sense to use enums as coverage levels, argparse should support, at least argparse-utils
-
         # Coverage based on given level to determine if failed or not and failure reasons as string array
         coverage_level_fulfilled = True
         coverage_level_failure_reasons = []
 
-        if self.coverage_level_required == None:
+        if self.coverage_level_required == ApiCoverageLevel.COVERAGE_DISABLED:
             # Failure analysis and failure report is not made at all
             pass
-        if self.coverage_level_required == "1":
+        if self.coverage_level_required == ApiCoverageLevel.COVERAGE_ENDPOINT:
             # Check endpoint coverage
             for endpoint in self.endpoints.keys():
                 # Skip excluded endpoints
@@ -926,7 +947,7 @@ class ASC:
                     # Add failure and reason
                     coverage_level_failure_reasons.append(f"Endpoint {endpoint} is not used")
 
-        if self.coverage_level_required == "2":
+        if self.coverage_level_required == ApiCoverageLevel.COVERAGE_METHOD:
             # Check method coverage
             for endpoint in self.endpoints.keys():
                 # Skip excluded endpoints
@@ -938,7 +959,7 @@ class ASC:
                     for mtd in self.endpoints[endpoint].get_methods_not_used():
                         coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} is not used")
 
-        if self.coverage_level_required == "3":
+        if self.coverage_level_required == ApiCoverageLevel.COVERAGE_RESPONSE:
             # Check response coverage
             for endpoint in self.endpoints.keys():
                 # Skip excluded endpoints
@@ -951,7 +972,7 @@ class ASC:
                         coverage_level_fulfilled = False
                         coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} response {resp} is not used")
 
-        if self.parameter_coverage_level_required in ["1", "2"]:
+        if self.parameter_coverage_level_required in [ParameterCoverageLevel.COVERAGE_USED_ONCE, ParameterCoverageLevel.COVERAGE_USED_TWICE_UNIQUELY]:
             # Check parameter coverage
             # Every mentioned api parameter must be used once
             # TODO: Parameter exclusion, how to implement?
@@ -962,11 +983,11 @@ class ASC:
 
                 for mtd in self.endpoints[endpoint].methods.keys():
                     for param in self.endpoints[endpoint].methods[mtd].parameters:
-                        if self.parameter_coverage_level_required == "1":
+                        if self.parameter_coverage_level_required == ParameterCoverageLevel.COVERAGE_USED_ONCE:
                             if param.usage_count == 0:
                                 coverage_level_fulfilled = False
                                 coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} not used")
-                        elif self.parameter_coverage_level_required == "2":
+                        elif self.parameter_coverage_level_required == ParameterCoverageLevel.COVERAGE_USED_TWICE_UNIQUELY:
                             if len(param.unique_values) < 2:
                                 coverage_level_fulfilled = False
                                 coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} used uniquely {len(param.unique_values)} times. 2 unique usages required to fullfill this coverage requirement")
@@ -1063,7 +1084,7 @@ class ASC:
         endpoint_dictionaries = []
 
         for e in self.endpoints:
-           endpoint_dictionaries.append(self.endpoints[e].get_as_dictionary())
+            endpoint_dictionaries.append(self.endpoints[e].get_as_dictionary())
 
         all_data_dictionary['endpoints'] = endpoint_dictionaries
 
@@ -1082,62 +1103,70 @@ class ASC:
 
         template.stream(data=all_data).dump(filename)
 
-    def crash_program(self, suppress_crash=False):
-       # Crash program with exit code 1 if needed and not suppressed
-       # This intends to serve Jenkins or other CI tool purposes to indicate that testing is not good enough
-       if suppress_crash:
-           return
-
-       if not self.coverage_requirement_passed or not self.anomaly_requirements_passed:
-           # Crash program
-           exit(1)
+    def crash_program(self, crash_on_critical_failure=True):
+        # Crash program with exit code 1 if needed and not suppressed
+        # This intends to serve Jenkins or other CI tool purposes to indicate that testing is not good enough
+        if crash_on_critical_failure and (not self.coverage_requirement_passed or not self.anomaly_requirements_passed):
+            # Crash program
+            exit(1)
 
 
 def main():
-   coveragefailurereportname = "coverage_failure_report.txt"
-   anomalyreportname = "anomaly_report.txt"
+    # Use configuration file instead of command line because different settings are starting to be too complex
+    parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
+    parser.add_argument('apispec', help='Api specification file')
+    parser.add_argument('harfile', help='Captured traffic in HAR file format')
+    parser.add_argument("--cf", help="Configuration file", default="config.ini")
 
-   anomalyfailurereportname = "anomaly_failure_report.txt"
+    args = parser.parse_args()
 
-   large_report_text_filename = "large_report_text.txt"
-   large_report_json_filename = "large_report_json.json"
+    # Get config parser
+    config = configparser.ConfigParser()
+    config.read(args.cf)
 
-   parser = argparse.ArgumentParser(description='Calculate API spec coverage from HAR files and API spec')
-   parser.add_argument('apispec', help='Api specification file')
-   parser.add_argument('harfile', help='Captured traffic in HAR file format')
-   parser.add_argument('failurereportname', nargs="?", type=str, default=coveragefailurereportname, help=f"Name of failure report, if not given default is {coveragefailurereportname}. If similar named file exist, it will be overwritten.")
-   parser.add_argument('anomalyreportname', nargs="?", type=str, default=anomalyreportname,
-                       help=f"Name of failure report, if not given default is {anomalyreportname}. If similar named file exist, it will be overwritten.")
-   parser.add_argument('largereporttext', nargs="?", type=str, default=large_report_text_filename, help=f"Name of large textual report, if not given default is {large_report_text_filename}. If similar named file exist, it will be overwritten.")
-   parser.add_argument('largereportjson', nargs="?", type=str, default=large_report_json_filename,
-                       help=f"Name of large textual report, if not given default is {large_report_json_filename}. If similar named file exist, it will be overwritten.")
+    # Get coverage level, default in broken config situation is disabled coverage analysis
+    api_coverage_level = ApiCoverageLevel[config.get('COVERAGE', 'api_coverage_level', fallback="COVERAGE_DISABLED")]
 
-   parser.add_argument('--coveragelevel', help='Specify coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. full coverage expected always on next things. 1 = endpoint coverage, 2 = method coverage, 3 = response coverage')
-   parser.add_argument('--parametercoveragelevel', help='Specify parameter coverage level which is required to be fullfilled for program not to crash, intended to be used with jenkins builds. 1 = require parameter to be used at least once, 2 = require parameter to be used with 2 unique values')
-   parser.add_argument('--anomaliestocausefailure', nargs='+', action=enum_action(AnomalyType), help='List anomaly names which occurrence will cause program to crash')
-   parser.add_argument('--anomalyfailurereportname',  nargs="?", type=str, default=anomalyfailurereportname,
-                       help=f"Name of anomaly failure report, if not given default is {anomalyfailurereportname}. If similar named file exist, it will be overwritten.")
+    # Get parameter coverage level, if not specified, parameter coverage will be disabled
+    parameter_coverage_level = ParameterCoverageLevel[config.get('COVERAGE', 'parameter_coverage_level', fallback="COVERAGE_DISABLED")]
 
-   parser.add_argument('--exclude', nargs='+', type=str, default=[], help='Exclude endpoints by writing exact paths of those, for example /pet or /pet/{petId}/asdfadsf ')
-   parser.add_argument('--suppressconsole', help="Suppress console outputs", action='store_true')
-   parser.add_argument('--suppressconsoleanomalies', help="Suppress listing of full anomalies in console output", action='store_true')
-   parser.add_argument('--dontcrashinfailures', action='store_true', help="Do not crash program in the end even if coverage level or critical anomaly would cause crash")
+    # Get and parse list of anomalies which will cause error
+    critical_anomalies_config = config.get('CRITICAL_ANOMALIES', 'critical_anomalies', fallback="")
+    critical_anomalies = []
 
-   args = parser.parse_args()
-   asc = ASC(args.apispec, args.harfile, coverage_level_required=args.coveragelevel, endpoints_excluded=args.exclude,
-             parameter_coverage_level_required=args.parametercoveragelevel, anomaly_types_causing_crash=args.anomaliestocausefailure)
+    for ca in critical_anomalies_config.split(','):
+        critical_anomalies.append(AnomalyType[ca])
 
-   asc.read_api_specification()
-   asc.read_har_file()
-   asc.preprocess_har_entries()
-   asc.analyze()
-   asc.print_analysis_to_console(args.suppressconsoleanomalies)
-   asc.analyze_and_export_coverage_failure_report(args.failurereportname)
-   asc.analyze_and_export_anomaly_report(args.anomalyreportname, args.anomalyfailurereportname)
-   asc.export_large_report_text(args.largereporttext)
-   asc.export_large_report_json(args.largereportjson)
-   asc.crash_program(suppress_crash=args.dontcrashinfailures)
+    # Get misc settings
+    crash_in_critical_failure = config.getboolean('MISC', 'crash_in_critical_failure', fallback=True)
+    suppress_console_anomalies_output = config.getboolean('MISC', 'suppress_console_anomalies_output', fallback=False)
+
+    # Get and parse list of endpoints which will be excluded from coverage analysis
+    exclude_endpoints_config = config.get('EXCLUSIONS', 'exclude_endpoints', fallback="")
+    exclude_endpoints = []
+
+    for ee in exclude_endpoints_config.split(','):
+        exclude_endpoints.append(ee)
+
+    asc = ASC(args.apispec, args.harfile,
+              coverage_level_required=api_coverage_level,
+              endpoints_excluded=exclude_endpoints,
+              parameter_coverage_level_required=parameter_coverage_level,
+              anomaly_types_causing_crash=critical_anomalies)
+
+    asc.read_api_specification()
+    asc.read_har_file()
+    asc.preprocess_har_entries()
+    asc.analyze()
+    asc.print_analysis_to_console(suppress_console_anomalies_output)
+    asc.analyze_and_export_coverage_failure_report(config['FILE_PATHS']['report_filename_coverage_failure_report'])
+    asc.analyze_and_export_anomaly_report(config['FILE_PATHS']['report_filename_anomaly_failure_report'],
+                                          config['FILE_PATHS']['report_filename_anomaly_report'])
+    asc.export_large_report_text(config['FILE_PATHS']['report_filename_large_report_txt'])
+    asc.export_large_report_json(config['FILE_PATHS']['report_filename_large_report_json'])
+
+    asc.crash_program(crash_on_critical_failure=crash_in_critical_failure)
 
 
 if __name__ == '__main__':
-   main()
+    main()
