@@ -62,7 +62,6 @@ class Endpoint:
             # Endpoint method called which does not exist
             # Make anomaly out of it
             # Consider if this is futile and this could be discarded, because it is not "touching api"
-            # TODO: Not yet outputted to anywhere, make report output
             self.anomalies.append(Anomaly(
                 entry=entry,
                 type=AnomalyType.UNDEFINED_METHOD_OF_ENDPOINT,
@@ -78,10 +77,15 @@ class Endpoint:
         '''
 
         url_parsed = urlparse(url)
-
         # TODO: Consider giving endpoint also server name and other stuff to filter out some weird ulrs
 
         # TODO: Consider need of basepath and server because OA v3 can have multiple servers too
+
+        # Is basepath needed at all? end of url is the part which is compared anyway
+        # if server name remains most likely irrelevant this should not be problem
+        # And if weird special cases can be tolerated, this should be ok
+        # url.parsed.path, problem with endswith might be that it might match to something else too
+        # Like alsdkfj/aksldfj/pet to /pet
 
         # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
@@ -314,7 +318,7 @@ class SingleMethod:
                                     ))
 
                 # Requestbody (OA V3) is treated as OA V2 body
-                elif param.location in ('body', 'requestbody'):
+                elif param.location in ['body', 'requestbody']:
                     # Checks and validates body content of request and treats it as one parameter
                     # Openapi V3 does not have body parameter and it is replaced by 'requestBody' object
                     paramvalue = entry['request']['postData']['text']
@@ -332,6 +336,8 @@ class SingleMethod:
 
                     else:
                         # Select schema from options based on postdata mimetype
+
+                        # FIXME: Check that mimetype is not empty/is valid field
                         postdata_mimetype = entry['request']['postData']['mimeType']
 
                         sch = ""
@@ -345,9 +351,24 @@ class SingleMethod:
                             sch = json.loads(json.dumps(param.schemas[postdata_mimetype]))
 
                         else:
-                            # TODO: Consider what kind of exceptions could happend
-                            pass
+                            # Mimetype is not found straight out and wildcards must be checked
+                            # Subtype wildcards matching
+                            main_type = postdata_mimetype.split('/')[0]
+                            wildcard_type = main_type + "/*"
 
+                            if wildcard_type in param.schemas:
+                                sch = json.loads(json.dumps(param.schemas[wildcard_type]))
+                            else:
+                                # Still not found, last change is to find schema for common wildcard
+                                if "*/*" in param.schemas:
+                                    sch = json.loads(json.dumps(param.schemas["*/*"]))
+
+                                else:
+                                    # No match for request mimetype
+                                    self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
+                                                                  f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
+
+                        # fixme: Skip validation if schema is empty and add anomaly is necessary
                         try:
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except ValidationError as e:
@@ -509,6 +530,7 @@ class AnomalyType(Enum):
     DEFAULT_RESPONSE_IS_NOT_USED = 6 # Is this error at all?
     INVALID_RESPONSE_BODY = 7
     UNDEFINED_METHOD_OF_ENDPOINT = 8
+    UNMATCHED_REQUEST_BODY_MIMETYPE = 9
 
 
 class Anomaly:
@@ -779,6 +801,7 @@ class ASC:
                     schemas = {}
                     for media_type, media_object in paths[endpoint][method]['requestBody']['content'].items():
                         if 'schema' in media_object:
+                            # FIXME: Schema might not be present at all, consider making empty ones to make better anomalies
                             schemas[media_type] = media_object['schema']
 
                     params_operation.append(Parameter('requestBody', 'requestbody', schemas=schemas))
@@ -1020,6 +1043,7 @@ class ASC:
         If crashing anomaly is found, write those to separate file and crash the program later
         :return:
         '''
+        # FIXME: does not check endpoint anomalies in case of critical one
         # For now use simple text file for failure report
         with open(critical_anomaly_report_filename, 'w') as file:
             for endpoint in self.endpoints.keys():
