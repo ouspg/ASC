@@ -833,20 +833,6 @@ class ASC:
 
                     responses_operation.append(Response(code, schema))
 
-                # OpenAPI v3 has requestbody field instead of form and body parameters
-                if 'requestBody' in paths[endpoint][method].keys():
-                    # OA V3
-                    # TODO: consider how to apply schemas in this and think requestbody things
-
-                    # Collect schemas
-                    schemas = {}
-                    for media_type, media_object in paths[endpoint][method]['requestBody']['content'].items():
-                        if 'schema' in media_object:
-                            # FIXME: Schema might not be present at all, consider making empty ones to make better anomalies
-                            schemas[media_type] = media_object['schema']
-
-                    params_operation.append(Parameter('requestBody', 'requestbody', schemas=schemas))
-
                 # Endpoint parameters are parsed to operation level (singlemethod)
 
                 # Add here only params which are not duplicate (overriden endpoint params are dropped)
