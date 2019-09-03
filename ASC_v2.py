@@ -274,6 +274,7 @@ class SingleMethod:
 
             for param in self.parameters:
                 if param.location == 'path':
+                    # TODO: Check if it even in theory possible that path parameter has schema
                     # Use new utility function now
                     paramvalue = path_parameter_extractor(url, self.path, param.name)
 
@@ -281,6 +282,8 @@ class SingleMethod:
                     param.add_usage(paramvalue)
 
                 elif param.location == 'query':
+                    # TODO: Check if schema exists, and then validate parameter against it, otherwise do nothing
+                    #  Do same to other param types and possibly refactor this whole loop
                     # Check query parameters as default way
                     # Is query params always required?
                     parameter_found = False
@@ -298,6 +301,20 @@ class SingleMethod:
                                                                "Required parameter " + str(
                                                                    param.name) + " was not found in request query parameters"
                                                       ))
+                elif param.location == 'cookie':
+                    # Cookie parameters are only available in OpenApi V3 spec
+                    parameter_found = False
+                    for cookieparameter in entry['request']['cookies']:
+                        if cookieparameter['name'] == param.name:
+                            paramvalue = cookieparameter['value']
+                            param.add_usage(paramvalue)
+                            parameter_found = True
+
+                    if param.required and not parameter_found:
+                        self.anomalies.append(Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                                 "Required parameter " + str(
+                                                     param.name) + " was not found in request cookie parameters"
+                                                 ))
 
                 elif param.location == 'header':
                     # Check request header parameters as default way
@@ -318,13 +335,13 @@ class SingleMethod:
                                     ))
 
                 # Requestbody (OA V3) is treated as OA V2 body
-                elif param.location in ['body', 'requestbody']:
+                elif param.location == 'body':
                     # Checks and validates body content of request and treats it as one parameter
                     # Openapi V3 does not have body parameter and it is replaced by 'requestBody' object
                     paramvalue = entry['request']['postData']['text']
                     param.add_usage(paramvalue)
 
-                    # TODO: Possibly new feature to check and handle single schema fields as parameters if needed
+                    # TODO: Add check of existence because request body body may not be requried
 
                     try:
                         ins = json.loads(paramvalue)
@@ -337,14 +354,15 @@ class SingleMethod:
                     else:
                         # Select schema from options based on postdata mimetype
 
-                        # FIXME: Check that mimetype is not empty/is valid field
+                        # TODO: Check that mimetype is not empty/is valid field
                         postdata_mimetype = entry['request']['postData']['mimeType']
 
                         sch = ""
 
-                        # Check if single schema is specified (OA v2)
-                        if param.schema is not None:
-                            sch = json.loads(json.dumps(param.schema))
+                        # Check that available schemas exist
+                        if not param.schemas:
+                            # TODO: Determine behaviour in this case where there is no schemas
+                            pass
 
                         # Check if schema is found from set of multiple possible schemas by mimetype (OA v3)
                         elif postdata_mimetype in param.schemas:
@@ -368,7 +386,8 @@ class SingleMethod:
                                     self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
                                                                   f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
 
-                        # fixme: Skip validation if schema is empty and add anomaly is necessary
+                        # TODO: Skip validation if no schema and determine if anomaly is needed for that
+
                         try:
                             validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                         except ValidationError as e:
@@ -401,7 +420,7 @@ class SingleMethod:
                         # Form parameters can be found in text field of HAR too, which case special parsing is required
                         # Parse multipart data from response with custom functions
 
-                        # TODO: getting boundary and parsed data are so tightly connected that consider combining
+                        # TODO: Getting boundary and parsed data are so tightly connected that consider combining
                         # Have to make own decoder because requests_toolbelt.MultipartDecoder does not work!
                         bound = get_multipart_boundary(entry['request'])
                         parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
@@ -458,7 +477,7 @@ class SingleMethod:
                 # Undefined response code detected
                 # Decide if default response is present and make anomaly text based on it
 
-                # TODO: Closer inspection on default schemas and stuff needed
+                # TODO: Determine how default responses and its schemas behave here
 
                 default_response_exists = False
                 for resp in self.responses:
@@ -549,20 +568,16 @@ class Anomaly:
         return anomaly_dictionary
 
 
-# TODO: Consider making location to be enum if needed
-# Should this be handling also requestbody?
-# Should parameter class be changed to "requestparameter" or "requestcontent"
-# Schemas could be dictionary of schemas...
+# TODO: Consider renaming this parameter class, as it handles now requestbodies too
 class Parameter:
-    def __init__(self, name, location, required=False, schemas=None, schema=None):
+    def __init__(self, name, location, required=False, schemas={}):
         self.name = name
-        self.location = location # path, query, body, formdata etc, should enum be made?
-        self.required = required #Boolean, not yet used, could be futile because cannot know if request omits it purposefully
-        #self.schema = schema #Schema, not yet used
 
-        # Use single schema with OA v2 and dictionary of multiple schemas with OA v3
-        # Schemas used only when location is requestbody
-        self.schema = schema
+        # Location can be path, query, body, header, formdata or cookie
+        self.location = location
+        self.required = required
+
+        # Schemas of the parameter are stored in mimetype -> schema dictionary
         self.schemas = schemas
 
         self.usage_count = 0
@@ -591,16 +606,20 @@ class Parameter:
 
 
 class Response:
-    def __init__(self, code, schema):
+    def __init__(self, code, schema, schemas=[]):
+        # TODO: Consider also what to do with range definitions 1XX, 5XX and etc
         self.code = code
-        # Should multiple schemas be available because those exist in api specs too?
+        # TODO: Make similar mimetype checks as requestbody does because openapi supports multiple schemas
+        # Common schema Swagger
         self.schema = schema
+
+        # Mimetype based schema
+
         self.usage_count = 0
         self.unique_body_values = set()
 
     def add_usage(self, value):
-        # Increase counter and add value if uniq
-        # Should also default response be noted?
+        # CHECK: Is default response calculated correctly
         self.usage_count = self.usage_count + 1
         self.unique_body_values.add(value)
 
@@ -619,7 +638,7 @@ class Response:
         return response_dictionary
 
 
-# Or should name be api coverage level and names be coverage_endpoint
+# Api coverage level setting enum
 class ApiCoverageLevel(Enum):
     COVERAGE_DISABLED = 0
     COVERAGE_ENDPOINT = 1
@@ -627,6 +646,7 @@ class ApiCoverageLevel(Enum):
     COVERAGE_RESPONSE = 3
 
 
+# Parameter coverage level setting enum
 class ParameterCoverageLevel(Enum):
     COVERAGE_DISABLED = 1
     COVERAGE_USED_ONCE = 2
@@ -642,24 +662,19 @@ class ASC:
         self.apispec = ""
         self.harobject = ""
 
-        self.options = "" # Is most likely futile
-
         self.endpoints = {}
         self.basepath = ""
-
-        self.version = "" # Not used, is this futile?
 
         self.endpoints_excluded = endpoints_excluded
 
         self.coverage_level_required = coverage_level_required
         self.parameter_coverage_level_required = parameter_coverage_level_required
 
-        # Set passing of coverage initially true and later analysis can change it to false
+        # Set passing of coverage and anomaly encounter initially true and later analysis can change it to false
         self.coverage_requirement_passed = True
-
-        # Critical anomaly encountered
         self.anomaly_requirements_passed = True
 
+        # Total usage and entry counters
         self.total_api_usages = 0
         self.total_har_entries = 0
 
@@ -679,20 +694,19 @@ class ASC:
         self.endpoints_count = 0
         self.endpoints_used = 0
 
-        # Common API info
-        self.open_api_version = "" # v2 or v3
-        self.api_name = "" # info object title
-        self.api_version = "" # info object version
-        self.api_description = "" # info object description, not required
+        # Common API info from api specification file
+        self.open_api_version = ""
+        self.api_name = ""
+        self.api_version = ""
+        self.api_description = ""
 
         # Common HAR info
         self.first_entry_in_har_time = ""
 
-        # Request URLs which were filtered out during preprocessing
+        # Request URLs which are not touching api
         self.har_filtered_out_request_urls = []
 
-        # Anomaly types, which will cause the crash of program
-        # Should those be called critical anomalies?
+        # Anomaly types, which will cause the crash of program aka "critical anomalies"
         self.anomaly_types_causing_crash = anomaly_types_causing_crash
 
     def read_har_file(self):
@@ -712,8 +726,6 @@ class ASC:
             print(str(e))
             exit(1)
 
-        self.version = specparser.version
-
         self.apispec = specparser.specification
         paths = specparser.specification['paths']
 
@@ -728,8 +740,7 @@ class ASC:
         # Parse endpoints
         for endpoint in paths.keys():
             # Parse endpoint specific parameters if those exist
-            # TODO: Need to think how schemas are appended here
-            # Both oa specses seems to have their respective parameters there parameters there
+            # Both oa specses seems to have their endpoint-specific parameters here
             params_endpoint = []
             if 'parameters' in paths[endpoint].keys():
                 # Common parameters for endpoint exists
@@ -738,28 +749,32 @@ class ASC:
                     if 'required' in param:
                         param_required = param['required']
 
-                    schema = None
+                    param_schemas = {}
+                    # TODO: Reconsider if sensible to use wildcard here
                     if 'schema' in param:
-                        schema = param['schema']
+                        param_schemas['*/*'] = param['schema']
+                    # If content is in parameter, it will have very complex content and potentially multiple schemas
+                    elif 'content' in param:
+                        for mimetype in param['content'].keys():
+                            param_schemas[mimetype] = param['content'][mimetype]['schema']
 
-                    params_endpoint.append(Parameter(param['name'], param['in'], required=param_required, schema=schema))
+                    params_endpoint.append(Parameter(param['name'], param['in'], required=param_required, schemas=param_schemas))
 
             mthds = {}
 
             for method in paths[endpoint].keys():
                 # Operation params can override endpoint params
                 params_operation = []
-
-                # TODO: Need tho think if common responses affect these
                 responses_operation = []
 
+                # Parameters of method
                 if 'parameters' in paths[endpoint][method].keys():
                     # Common parameters for endpoint exists
                     for param in paths[endpoint][method]['parameters']:
                         param_required = False
+                        param_schemas = {}
 
                         # Use schemas for OA v3 and schema for OA v2
-                        schema = None
                         if 'required' in param:
                             param_required = param['required']
 
@@ -767,15 +782,41 @@ class ASC:
 
                         # Parameter can have only one schema
 
-                        schema = None
+                        # Schema is in parameter which means it has only one schema
+                        # TODO: Reconsider if sensible to use wildcard here
                         if 'schema' in param:
-                            schema = param['schema']
+                            param_schemas['*/*'] = param['schema']
+                        # If content is in parameter, it will have very complex content and potentially multiple schemas
+                        elif 'content' in param:
+                            for mimetype in param['content'].keys():
+                                param_schemas[mimetype] = param['content'][mimetype]['schema']
 
                         params_operation.append(Parameter(param['name'], param['in'],
                                                           required=param_required,
-                                                          schema=schema))
+                                                          schemas=param_schemas))
 
-                # Responses
+                # TODO: Unify/combine this to similar code as above
+                # Handle OA V3 requestbody as simple body parameter
+                if 'requestBody' in paths[endpoint][method].keys():
+                    param_schemas = {}
+                    for media_type, media_object in paths[endpoint][method]['requestBody']['content'].items():
+                        if 'schema' in media_object:
+                            param_schemas[media_type] = media_object['schema']
+
+                    # Request body may be required or not, defaults to not (according to OA V3 spec)
+                    param_required = False
+                    if 'required' in paths[endpoint][method]['requestBody']:
+                        if paths[endpoint][method]['requestBody']['required']:
+                            param_required = True
+
+                    # This is named as requestbody, but treated as body in analysis
+                    params_operation.append(Parameter("requestBody", "body",
+                                                      required=param_required,
+                                                      schemas=param_schemas))
+
+                # Responses of method
+                # TODO: Find out if there is for example api wide responses
+                #  because there is no endpoint wide responses
                 # TODO: Consider if this should be changed to dict of responses (otherwise same, key as response code)
                 for code in paths[endpoint][method]['responses'].keys():
                     # Get schema if it exists
@@ -998,7 +1039,7 @@ class ASC:
         if self.parameter_coverage_level_required in [ParameterCoverageLevel.COVERAGE_USED_ONCE, ParameterCoverageLevel.COVERAGE_USED_TWICE_UNIQUELY]:
             # Check parameter coverage
             # Every mentioned api parameter must be used once
-            # TODO: Parameter exclusion, how to implement?
+            # TODO: Determine if parameter exclusion is needed and how to efficiently implement
             for endpoint in self.endpoints.keys():
                 # Skip excluded endpoints
                 if endpoint in self.endpoints_excluded:
@@ -1043,10 +1084,18 @@ class ASC:
         If crashing anomaly is found, write those to separate file and crash the program later
         :return:
         '''
-        # FIXME: does not check endpoint anomalies in case of critical one
         # For now use simple text file for failure report
         with open(critical_anomaly_report_filename, 'w') as file:
             for endpoint in self.endpoints.keys():
+                # Check endpoint anomalies
+                for endpoint_anomaly in self.endpoints[endpoint].anomalies:
+                    if endpoint_anomaly.type in self.anomaly_types_causing_crash:
+                        # Critical failure anomaly encountered
+                        file.write(endpoint_anomaly.description + "\n")
+                        file.write(str(endpoint_anomaly.entry) + "\n")
+                        self.anomaly_requirements_passed = False
+
+                # Check anomalies in endpoints method
                 for method in self.endpoints[endpoint].methods.keys():
                     for anomaly in self.endpoints[endpoint].methods[method].anomalies:
                         if anomaly.type in self.anomaly_types_causing_crash:
