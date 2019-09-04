@@ -441,66 +441,109 @@ class SingleMethod:
                                         ))
 
             # Analyzing responses
+
             response_code = str(entry['response']['status'])
-            response_code_found = False
+            response_code_found_explicit_definition = False
+            response_code_found_range_definition = False
+            response_code_range_definition = ""
+            response_code_found_default_definition = False
+
+            # First, determine if seen response code is defined, range defined or default defined
             for resp in self.responses:
+                # Checking if response has explicit definition
                 if resp.code == response_code:
-                    response_code_found = True
-                    resp.add_usage(entry['response']['content']['text'])
-
-                    # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
-                    # Now xml bodies produce JSON parsing error
-
-                    # If response has schema specified, compare response body content with it
-
-                    # Check if dictionary of schemas is not empty before starting to validate
-
-                    # TODO: Check that mimetype is not empty/is valid field
-                    #  It might be like 'application/xml;charset=UTF-8' too, at least in response!
-
-                    response_mimetype = entry['response']['content']['mimeType']
-                    # Check if dictionary of schemas is not empty before starting to validate
-                    if not resp.schemas:
-                        # Try to select suitable schema
-                        sch = None
-
-                        for schema_mimetype, schema_schema in resp.schemas:
-                            # First, look for full match
-                            if schema_mimetype in response_mimetype.split(';'):
-                                sch = json.loads(json.dumps(schema_schema))
-
-                        # If no match, try single wildcard search
-                        # TODO: Try single wildcard here
-                        if sch is None:
-                            pass
-
-                        # If no match, try all wildcard schema aka default schema
-                        if sch is None:
-                            if '*/*' in resp.schemas:
-                                sch = json.loads(json.dumps(resp.schemas['*/*']))
-                            else:
-                                # TODO: Something has gone wrong, add anomaly about wrong mimetype
-                                pass
-
-                        if sch is not None:
-                            # Try parse and validate
-                            try:
-                                ins = json.loads(entry['response']['content']['text'])
-                                validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                            except json.decoder.JSONDecodeError as e:
-                                self.anomalies.append(
-                                    Anomaly(entry,
-                                            AnomalyType.INVALID_RESPONSE_BODY,
-                                            f"JSON parsing error when parsing response body. Error message:{str(e)}"))
-
-                            except ValidationError as e:
-                                self.anomalies.append(
-                                    Anomaly(entry,
-                                              AnomalyType.INVALID_RESPONSE_BODY,
-                                              f"Validator produced validation error when validating response body. Error message:{str(e)}"))
-
+                    response_code_found_explicit_definition = True
                     break
 
+                # Checking if response has range definition
+                if resp.code in ['1XX', '2XX', '3XX', '4XX', '5XX']:
+                    # Check if traffic entry fits into that range definition by companing first number
+                    if response_code[0] == resp.code[0]:
+                        response_code_found_range_definition = True
+                        response_code_range_definition = resp.code
+
+                if resp.code == 'default':
+                    response_code_found_default_definition = True
+
+            # Determine in which definition response falls
+            response_selection = ""
+            if response_code_found_explicit_definition:
+                response_selection = response_code
+            elif response_code_found_range_definition:
+                response_selection = response_code_range_definition
+            elif response_code_found_default_definition:
+                # TODO: Consider if this anomaly is sensible
+                self.anomalies.append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
+                                              "Response code " + str(
+                                                  response_code) + " is not explictly defined in API specification, but default response is present"))
+                response_selection = 'default'
+            else:
+                # No response codes corresponding traffic entry, make anomaly
+                self.anomalies.append(
+                    Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_NOT_SPECIFIED,
+                            "Response code " + str(
+                                response_code) + " is not explictly defined in API specification, and default response is not present"))
+
+            # Decent response definition is found, start processing
+            if response_selection is not "":
+                for resp in self.responses:
+                    if resp.code == response_selection:
+                        resp.add_usage(entry['response']['content']['text'])
+
+                        # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
+                        # Now xml bodies produce JSON parsing error
+
+                        # If response has schema specified, compare response body content with it
+
+                        # Check if dictionary of schemas is not empty before starting to validate
+
+                        # TODO: Check that mimetype is not empty/is valid field
+                        #  It might be like 'application/xml;charset=UTF-8' too, at least in response!
+
+                        response_mimetype = entry['response']['content']['mimeType']
+                        # Check if dictionary of schemas is not empty before starting to validate
+                        if not resp.schemas:
+                            # Try to select suitable schema
+                            sch = None
+
+                            for schema_mimetype, schema_schema in resp.schemas:
+                                # First, look for full match
+                                if schema_mimetype in response_mimetype.split(';'):
+                                    sch = json.loads(json.dumps(schema_schema))
+
+                            # If no match, try single wildcard search
+                            # TODO: Try single wildcard here
+                            if sch is None:
+                                pass
+
+                            # If no match, try all wildcard schema aka default schema
+                            if sch is None:
+                                if '*/*' in resp.schemas:
+                                    sch = json.loads(json.dumps(resp.schemas['*/*']))
+                                else:
+                                    # TODO: Something has gone wrong, add anomaly about wrong mimetype
+                                    pass
+
+                            if sch is not None:
+                                # Try parse and validate
+                                try:
+                                    ins = json.loads(entry['response']['content']['text'])
+                                    validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
+                                except json.decoder.JSONDecodeError as e:
+                                    self.anomalies.append(
+                                        Anomaly(entry,
+                                                AnomalyType.INVALID_RESPONSE_BODY,
+                                                f"JSON parsing error when parsing response body. Error message:{str(e)}"))
+
+                                except ValidationError as e:
+                                    self.anomalies.append(
+                                        Anomaly(entry,
+                                                  AnomalyType.INVALID_RESPONSE_BODY,
+                                                  f"Validator produced validation error when validating response body. Error message:{str(e)}"))
+
+                        break
+            '''
+            # TODO: remove these when put into above fully
             if not response_code_found:
                 # Undefined response code detected
                 # Decide if default response is present and make anomaly text based on it
@@ -572,8 +615,8 @@ class SingleMethod:
                         Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_NOT_SPECIFIED,
                                 "Response code " + str(
                                     response_code) + " is not explictly defined in API specification, and default response is not present"))
-
-        # Add calculations of parameters and responses of this endpoint
+            '''
+        # Calculations of parameters and responses of this endpoint
         for r in self.responses:
             if r.code != 'default':
                 if r.usage_count != 0:
@@ -662,7 +705,6 @@ class Parameter:
 
 class Response:
     def __init__(self, code, schemas={}):
-        # TODO: Consider also what to do with range definitions 1XX, 5XX and etc
         self.code = code
         # TODO: Make similar mimetype checks as requestbody does because openapi supports multiple schemas
 
@@ -776,6 +818,7 @@ class ASC:
         # Parse API spec to endpoint and method objects with prance parser
 
         # NOTICE: OA v2 seems to be working fine with openapi spec validator and swagger validator too
+        # NOTICE: Json seems to be working always, but some cases yaml fails (problem with strings?)
         try:
             specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
         except Exception as e:
