@@ -344,7 +344,19 @@ class SingleMethod:
                     paramvalue = entry['request']['postData']['text']
                     param.add_usage(paramvalue)
 
-                    # TODO: Add check of existence because request body body may not be requried
+                    # Check for empty body, because body parameter or requestbody parameter can be not required too
+                    if (paramvalue == '') and param.required:
+                        # Add anomaly for missing body if it is required
+                        self.anomalies.append(
+                            Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                    "Required parameter " + str(
+                                        param.name) + " was not found in request header parameters"
+                                    ))
+                    else:
+                        # Add body parameter usage
+                        param.add_usage(paramvalue)
+
+                    # TODO: Should jump out if body is missing?
 
                     try:
                         ins = json.loads(paramvalue)
