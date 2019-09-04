@@ -278,6 +278,7 @@ class SingleMethod:
             for param in self.parameters:
                 if param.location == 'path':
                     # TODO: Check if it even in theory possible that path parameter has schema
+                    # Yes, in oa v3 is possible but in 2 maybe not
                     # Use new utility function now
                     paramvalue = path_parameter_extractor(url, self.path, param.name)
 
@@ -350,7 +351,7 @@ class SingleMethod:
                         self.anomalies.append(
                             Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
                                     "Required parameter " + str(
-                                        param.name) + " was not found in request header parameters"
+                                        param.name) + " was not found in request body"
                                     ))
                     else:
                         # Add body parameter usage
@@ -370,12 +371,14 @@ class SingleMethod:
                         # Select schema from options based on postdata mimetype
                         postdata_mimetype = entry['request']['postData']['mimeType']
 
+                        # TODO: Body should have at least schema object
+                        #  Consider making anomaly if schema is not found in spec and do not continue body analysis
+
                         # Schema selection code
                         selected_schema = find_best_mimetype_match_for_content_header(param.schemas.keys(), postdata_mimetype)
 
                         # If there was no schema
                         if not selected_schema:
-                            # TODO: Determine if schema not found is really an error
                             self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
                                                          f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
 
@@ -390,7 +393,11 @@ class SingleMethod:
                                                                            "Validator produced error when validating this request body" +
                                                                             f"Error {str(e)}"
                                                               ))
-                                # TODO: determine if adding unvalid request body anomaly here is needed
+                            except json.decoder.JSONDecodeError as e:
+                                self.anomalies.append(
+                                    Anomaly(entry,
+                                            AnomalyType.BROKEN_REQUEST_BODY,
+                                            f"JSON parsing error when parsing request body. Error message:{str(e)}"))
 
                 elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR
@@ -467,7 +474,6 @@ class SingleMethod:
             elif response_code_found_range_definition:
                 response_selection = response_code_range_definition
             elif response_code_found_default_definition:
-                # TODO: Consider if this anomaly is sensible
                 self.anomalies.append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
                                               "Response code " + str(
                                                   response_code) + " is not explictly defined in API specification, but default response is present"))
@@ -490,6 +496,9 @@ class SingleMethod:
 
                         response_mimetype = entry['response']['content']['mimeType']
 
+                        # TODO: Check that there is schema in first place
+                        #  It is possible in oa v2 that schema does simply exist in response body
+
                         # Schema selection for analysis
                         selected_schema = find_best_mimetype_match_for_content_header(resp.schemas.keys(),
                                                                                       response_mimetype)
@@ -497,9 +506,7 @@ class SingleMethod:
                         if not selected_schema:
                             self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
                                                           f"Can not find any matching response schema mimetype from API specification for {response_mimetype}"))
-                            # TODO: Think more what to do if schema is empty
                         else:
-                            # TODO: Can normal schema cause parsing error
                             sch = json.loads(json.dumps(resp.schemas[selected_schema]))
 
                             # Try parse and validate
@@ -507,10 +514,9 @@ class SingleMethod:
                                 ins = json.loads(entry['response']['content']['text'])
                                 validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
                             except json.decoder.JSONDecodeError as e:
-                                # TODO: Should it be invalid resp body and unparseable response body?
                                 self.anomalies.append(
                                     Anomaly(entry,
-                                            AnomalyType.INVALID_RESPONSE_BODY,
+                                            AnomalyType.BROKEN_RESPONSE_BODY,
                                             f"JSON parsing error when parsing response body. Error message:{str(e)}"))
 
                             except ValidationError as e:
@@ -519,6 +525,7 @@ class SingleMethod:
                                               AnomalyType.INVALID_RESPONSE_BODY,
                                               f"Validator produced validation error when validating response body. Error message:{str(e)}"))
 
+                            # TODO: Should this also catch some other errors?
                         break
 
         # Calculations of parameters and responses of this endpoint
@@ -549,11 +556,13 @@ class AnomalyType(Enum):
     BROKEN_REQUEST_BODY = 3
     UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED = 4
     BROKEN_RESPONSE_BODY = 5
-    DEFAULT_RESPONSE_IS_NOT_USED = 6 # Is this error at all?
+    DEFAULT_RESPONSE_IS_NOT_USED = 6
     INVALID_RESPONSE_BODY = 7
     UNDEFINED_METHOD_OF_ENDPOINT = 8
     UNMATCHED_REQUEST_BODY_MIMETYPE = 9
-
+# TODO: Should also invalid request body be added because there is both in responses too
+#  Consider validity of this anomaly approach
+# TODO: Consider sensibility of next 2 anomalies UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED DEFAULT_RESPONSE_IS_NOT_USED
 
 class Anomaly:
     def __init__(self, entry, type, description):
@@ -868,7 +877,6 @@ class ASC:
 
         # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
 
-        # TODO: Determine if some calculation efficiency can be achieved by pre-filtering "pages"
         for page in self.harobject.pages:
             for entry in page.entries:
                 self.total_har_entries = self.total_har_entries + 1

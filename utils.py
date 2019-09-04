@@ -21,7 +21,7 @@ def get_multipart_boundary(req_entry):
             return boundvalue
 
 
-# TODO: Improve readibility and write exhaustive testing and inspect multipart decoder to make your own
+# TODO: This works for now, but later more sophisticated multipart decoder might be needed
 def decode_multipart(text, boundary):
     # Returns array of tuple name-value pairs
     splitted_text = text.split(boundary)
@@ -71,6 +71,7 @@ def path_parameter_extractor(url, path, parameter_name):
 
 
 # TODO: write couple of unit tests for this
+# TODO: Should work for now, but needing parsing for more complex schema side mimetypes in future
 def find_best_mimetype_match_for_content_header(list_of_possible_mimetypes, content_header_string):
     # First, try to find straight match
     for singlefield in content_header_string.split(';'):
