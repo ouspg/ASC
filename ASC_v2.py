@@ -501,12 +501,13 @@ class SingleMethod:
                         #  It might be like 'application/xml;charset=UTF-8' too, at least in response!
 
                         response_mimetype = entry['response']['content']['mimeType']
+
                         # Check if dictionary of schemas is not empty before starting to validate
-                        if not resp.schemas:
+                        if resp.schemas:
                             # Try to select suitable schema
                             sch = None
 
-                            for schema_mimetype, schema_schema in resp.schemas:
+                            for schema_mimetype, schema_schema in resp.schemas.items():
                                 # First, look for full match
                                 if schema_mimetype in response_mimetype.split(';'):
                                     sch = json.loads(json.dumps(schema_schema))
@@ -542,80 +543,7 @@ class SingleMethod:
                                                   f"Validator produced validation error when validating response body. Error message:{str(e)}"))
 
                         break
-            '''
-            # TODO: remove these when put into above fully
-            if not response_code_found:
-                # Undefined response code detected
-                # Decide if default response is present and make anomaly text based on it
 
-                # TODO: Determine how default responses and its schemas behave here
-
-                default_response_exists = False
-                for resp in self.responses:
-                    if resp.code == 'default':
-                        default_response_exists = True
-                        # Adding usage to default response
-                        resp.add_usage(entry['response']['content']['text'])
-
-                        # Validate response schema of default response
-
-                        # TODO: Check that mimetype is not empty/is valid field
-                        #  It might be like 'application/xml;charset=UTF-8' too, at least in response!
-
-                        response_mimetype = entry['response']['content']['mimeType']
-                        # Check if dictionary of schemas is not empty before starting to validate
-                        if not resp.schemas:
-                            # Try to select suitable schema
-                            sch = None
-
-                            for schema_mimetype, schema_schema in resp.schemas:
-                                # First, look for full match
-                                if schema_mimetype in response_mimetype.split(';'):
-                                    sch = json.loads(json.dumps(schema_schema))
-
-                            # If no match, try single wildcard search
-                            # TODO: Try single wildcard here
-                            if sch is None:
-                                pass
-
-                            # If no match, try all wildcard schema aka default schema
-                            if sch is None:
-                                if '*/*' in resp.schemas:
-                                    sch = json.loads(json.dumps(resp.schemas['*/*']))
-                                else:
-                                    # TODO: Something has gone wrong, add anomaly about wrong mimetype
-                                    pass
-
-                            if sch is not None:
-                                # Try parse and validate
-                                try:
-                                    ins = json.loads(entry['response']['content']['text'])
-                                    validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-
-                                except json.decoder.JSONDecodeError as e:
-                                    self.anomalies.append(
-                                        Anomaly(entry,
-                                                AnomalyType.INVALID_RESPONSE_BODY,
-                                                f"JSON parsing error when parsing response body. Error message:{str(e)}"))
-
-                                except ValidationError as e:
-                                    self.anomalies.append(
-                                        Anomaly(entry,
-                                                AnomalyType.INVALID_RESPONSE_BODY,
-                                                f"Validator produced validation error when validating default response body. Error message:{str(e)}"))
-
-                        break
-
-                if default_response_exists:
-                    self.anomalies.append(Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED,
-                                                               "Response code " + str(response_code) + " is not explictly defined in API specification, but default response is present"))
-
-                else:
-                    self.anomalies.append(
-                        Anomaly(entry, AnomalyType.UNDEFINED_RESPONSE_CODE_DEFAULT_NOT_SPECIFIED,
-                                "Response code " + str(
-                                    response_code) + " is not explictly defined in API specification, and default response is not present"))
-            '''
         # Calculations of parameters and responses of this endpoint
         for r in self.responses:
             if r.code != 'default':
