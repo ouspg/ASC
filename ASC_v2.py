@@ -22,7 +22,7 @@ import configparser
 
 from requests_toolbelt.multipart import decoder
 
-from utils import TerminalColors, get_multipart_boundary, decode_multipart, path_parameter_extractor
+from utils import TerminalColors, get_multipart_boundary, decode_multipart, path_parameter_extractor, find_best_mimetype_match_for_content_header
 
 
 class Endpoint:
@@ -353,49 +353,29 @@ class SingleMethod:
 
                     else:
                         # Select schema from options based on postdata mimetype
-
-                        # TODO: Check that mimetype is not empty/is valid field
-                        #  It might be like 'application/xml;charset=UTF-8' too, at least in response!
                         postdata_mimetype = entry['request']['postData']['mimeType']
 
-                        sch = ""
+                        # Schema selection code
+                        selected_schema = find_best_mimetype_match_for_content_header(param.schemas.keys(), postdata_mimetype)
 
-                        # Check that available schemas exist
-                        if not param.schemas:
-                            # TODO: Determine behaviour in this case where there is no schemas
-                            pass
-
-                        # Check if schema is found from set of multiple possible schemas by mimetype (OA v3)
-                        elif postdata_mimetype in param.schemas:
-                            sch = json.loads(json.dumps(param.schemas[postdata_mimetype]))
+                        # If there was no schema
+                        if not selected_schema:
+                            # TODO: Determine if schema not found is really an error
+                            self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
+                                                         f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
 
                         else:
-                            # Mimetype is not found straight out and wildcards must be checked
-                            # Subtype wildcards matching
-                            main_type = postdata_mimetype.split('/')[0]
-                            wildcard_type = main_type + "/*"
+                            # Load schema which was found
+                            sch = json.loads(json.dumps(param.schemas[selected_schema]))
 
-                            if wildcard_type in param.schemas:
-                                sch = json.loads(json.dumps(param.schemas[wildcard_type]))
-                            else:
-                                # Still not found, last change is to find schema for common wildcard
-                                if "*/*" in param.schemas:
-                                    sch = json.loads(json.dumps(param.schemas["*/*"]))
-
-                                else:
-                                    # No match for request mimetype
-                                    self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
-                                                                  f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
-
-                        # TODO: Skip validation if no schema and determine if anomaly is needed for that
-
-                        try:
-                            validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                        except ValidationError as e:
-                            self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
-                                                                       "Validator produced error when validating this request body" +
-                                                                        f"Error {str(e)}"
-                                                          ))
+                            try:
+                                validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
+                            except ValidationError as e:
+                                self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
+                                                                           "Validator produced error when validating this request body" +
+                                                                            f"Error {str(e)}"
+                                                              ))
+                                # TODO: determine if adding unvalid request body anomaly here is needed
 
                 elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR

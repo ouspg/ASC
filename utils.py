@@ -68,3 +68,29 @@ def path_parameter_extractor(url, path, parameter_name):
     else:
         # Parameter name does not exist at all in path string
         return ""
+
+
+# TODO: write couple of unit tests for this
+def find_best_mimetype_match_for_content_header(list_of_possible_mimetypes, content_header_string):
+    # First, try to find straight match
+    for singlefield in content_header_string.split(';'):
+        # Explicit match found
+        if singlefield in list_of_possible_mimetypes:
+            return singlefield
+
+    # If explicit match not found, trying to look for match with wildcard
+
+    for possible_mimetype in list_of_possible_mimetypes:
+        # Look only for half-wildcard mimetypes
+        if '/*' in possible_mimetype and '*/*' not in possible_mimetype:
+            for singlefield in content_header_string.split(';'):
+                # Check if start of header mimetype is same than possible semi-wildcard mimetype
+                if (singlefield.split('/')[0] + '/*') == possible_mimetype:
+                    return possible_mimetype
+
+    # No good matches found, so must use general match '*/*' if it exists
+    if '*/*' in list_of_possible_mimetypes:
+        return '*/*'
+
+    # No matches found
+    return False
