@@ -1,13 +1,11 @@
 ASC - Large report
 
-OpenAPI version: TBA {{data.open_api_version}}
+OpenAPI version: {{data.open_api_version}}
 API name: {{data.api_name}}
 API version: {{data.api_version}}
 API description: {{data.api_description}}
 
 Analysis initiated: {{data.analysis_initiation_time}}
-
-HAR file first timestamp: TBA
 
 Common testing info
 
@@ -20,20 +18,15 @@ Total number of used endpoints {{data.total_endpoints_used}}
 Total number of methods: {{data.total_methods_in_endpoints_count}}
 Total number of methods used: {{data.total_methods_in_endpoints_used}}
 
-TBA: Consider if total number of responses and parameters needed
+Total number of explicit response codes: {{data.total_response_codes_count}}
+Total number of explicit response codes used: {{data.total_response_codes_used}}
 
-Total number of responses: TBA
-Total number of responses used: TBA
+Total number of default responses codes: {{data.total_default_responses_count}}
+Total number of default responses codes used: {{data.total_default_responses_used}}
 
-Total number of parameters: TBA
-Total number of parameters used: TBA
+TODO: Consider if it would be useful to add total parameters count etc
 
-PASS/FAIL analysis TBA if needed
-Analysis started with command line command: TBA
-Passed: TBA
-Coverage level given: TBA
-Endpoints excluded: TBA
-Failure reasons: TBA
+TODO: Consider if coverage/anomaly failures should be shown here too
 
 Endpoints:
 
@@ -42,14 +35,12 @@ Endpoint: {{endpoint.path}}
     Usage count: {{endpoint.usage_count}}
     Methods count: {{endpoint.methods_count}}
     Methods used: {{endpoint.methods_used}}
-    Response count and etc TBA:
+    Response codes (explicit) in all methods: {{endpoint.methods_used}}
+    Response codes (explicit) used in all methods: {{endpoint.response_codes_in_methods_used}}
 
     Methods of endpoint:
-
     {% for type, method in endpoint.methods.items() %}
         Type: {{type}}
-
-        Analysis of counts, responses, parameters, anomalies and everything TBA
 
         Responses:
             {% for response in method.responses %}
@@ -59,18 +50,19 @@ Endpoint: {{endpoint.path}}
             Response code: {{response.code}}
             {% endif %}
                 Usage count: {{response.usage_count}}
-                Unique body values: {{response.unique_body_values_count}}
+                Unique body values count: {{response.unique_body_values_count}}
+                Unique body values:
                 {% for ubv in response.unique_body_values %}
                     {{ubv}}
                 {% endfor %}
-                Schema: TBA
+                Schema: TODO: Add if neccessary
             {% endfor %}
         Parameters:
             {% for parameter in method.parameters %}
             Parameter name: {{parameter.name}}
                 Location: {{parameter.location}}
                 Required: {{parameter.required}}
-                Schema: TBA
+                Schema: TODO: Add if neccessary
                 Usage count: {{parameter.usage_count}}
                 Unique values: {{parameter.unique_values_count}}
                 {% for uv in parameter.unique_values %}

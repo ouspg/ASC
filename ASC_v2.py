@@ -30,7 +30,8 @@ class Endpoint:
         self.path = path
         self.methods = methods
         # Baseurl needed to eliminate changes for some weird urls in har to map incorrectly
-        self.baseurl = baseurl # Baseurl currently futile?
+        # Should also server url be specified?
+        self.baseurl = baseurl
         self.usage_count = 0
         self.excluded = excluded
 
@@ -162,6 +163,8 @@ class Endpoint:
             'usage_count': self.usage_count,
             'methods_count': self.methods_count,
             'methods_used': self.methods_used,
+            'response_codes_in_methods_count': self.response_codes_in_methods_count,
+            'response_codes_in_methods_used': self.response_codes_in_methods_used,
             'methods': {},
             'anomalies': self.anomalies
         }
@@ -688,9 +691,6 @@ class ASC:
         self.api_version = ""
         self.api_description = ""
 
-        # Common HAR info
-        self.first_entry_in_har_time = ""
-
         # Request URLs which are not touching api
         self.har_filtered_out_request_urls = []
 
@@ -722,6 +722,12 @@ class ASC:
 
         self.api_name = info_object['title']
         self.api_version = info_object['version']
+
+        # Get openapi/swagger version number
+        if 'openapi' in specparser.specification:
+            self.open_api_version = specparser.specification['openapi']
+        if 'swagger' in specparser.specification:
+            self.open_api_version = specparser.specification['swagger']
 
         if 'description' in info_object.keys():
             self.api_description = info_object['description']
@@ -875,7 +881,7 @@ class ASC:
 
             # Collect info from endpoint after it has been analyzed
             self.total_response_codes_count += self.endpoints[endpoint].response_codes_in_methods_count
-            self.total_response_codes_used += self.endpoints[endpoint].response_codes_in_methods_count
+            self.total_response_codes_used += self.endpoints[endpoint].response_codes_in_methods_used
 
             self.total_default_responses_count += self.endpoints[endpoint].default_response_codes_in_methods_count
             self.total_default_responses_used += self.endpoints[endpoint].default_response_codes_in_methods_used
@@ -1016,7 +1022,8 @@ class ASC:
         if self.parameter_coverage_level_required in [ParameterCoverageLevel.COVERAGE_USED_ONCE, ParameterCoverageLevel.COVERAGE_USED_TWICE_UNIQUELY]:
             # Check parameter coverage
             # Every mentioned api parameter must be used once
-            # TODO: Determine if parameter exclusion is needed and how to efficiently implement
+            # Future issue could be definition of parameter exclusion in coverage
+
             for endpoint in self.endpoints.keys():
                 # Skip excluded endpoints
                 if endpoint in self.endpoints_excluded:
@@ -1114,10 +1121,8 @@ class ASC:
            'api_name': self.api_name,
            'api_description': self.api_description,
            'api_version': self.api_version,
-
            'total_api_usages': self.total_api_usages,
            'total_har_entries': self.total_har_entries,
-           'first_entry_in_har_time': self.first_entry_in_har_time,
            'har_filtered_out_request_urls': self.har_filtered_out_request_urls,
            'analysis_initiation_time': self.analysis_initiated,
            'endpoints': [],
