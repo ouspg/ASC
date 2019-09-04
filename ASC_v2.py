@@ -473,54 +473,36 @@ class SingleMethod:
                         # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
                         # Now xml bodies produce JSON parsing error
 
-                        # If response has schema specified, compare response body content with it
-
-                        # Check if dictionary of schemas is not empty before starting to validate
-
-                        # TODO: Check that mimetype is not empty/is valid field
-                        #  It might be like 'application/xml;charset=UTF-8' too, at least in response!
-
                         response_mimetype = entry['response']['content']['mimeType']
 
-                        # Check if dictionary of schemas is not empty before starting to validate
-                        if resp.schemas:
-                            # Try to select suitable schema
-                            sch = None
+                        # Schema selection for analysis
+                        selected_schema = find_best_mimetype_match_for_content_header(resp.schemas.keys(),
+                                                                                      response_mimetype)
+                        # If there was no schema
+                        if not selected_schema:
+                            self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
+                                                          f"Can not find any matching response schema mimetype from API specification for {response_mimetype}"))
+                            # TODO: Think more what to do if schema is empty
+                        else:
+                            # TODO: Can normal schema cause parsing error
+                            sch = json.loads(json.dumps(resp.schemas[selected_schema]))
 
-                            for schema_mimetype, schema_schema in resp.schemas.items():
-                                # First, look for full match
-                                if schema_mimetype in response_mimetype.split(';'):
-                                    sch = json.loads(json.dumps(schema_schema))
+                            # Try parse and validate
+                            try:
+                                ins = json.loads(entry['response']['content']['text'])
+                                validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
+                            except json.decoder.JSONDecodeError as e:
+                                # TODO: Should it be invalid resp body and unparseable response body?
+                                self.anomalies.append(
+                                    Anomaly(entry,
+                                            AnomalyType.INVALID_RESPONSE_BODY,
+                                            f"JSON parsing error when parsing response body. Error message:{str(e)}"))
 
-                            # If no match, try single wildcard search
-                            # TODO: Try single wildcard here
-                            if sch is None:
-                                pass
-
-                            # If no match, try all wildcard schema aka default schema
-                            if sch is None:
-                                if '*/*' in resp.schemas:
-                                    sch = json.loads(json.dumps(resp.schemas['*/*']))
-                                else:
-                                    # TODO: Something has gone wrong, add anomaly about wrong mimetype
-                                    pass
-
-                            if sch is not None:
-                                # Try parse and validate
-                                try:
-                                    ins = json.loads(entry['response']['content']['text'])
-                                    validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                                except json.decoder.JSONDecodeError as e:
-                                    self.anomalies.append(
-                                        Anomaly(entry,
-                                                AnomalyType.INVALID_RESPONSE_BODY,
-                                                f"JSON parsing error when parsing response body. Error message:{str(e)}"))
-
-                                except ValidationError as e:
-                                    self.anomalies.append(
-                                        Anomaly(entry,
-                                                  AnomalyType.INVALID_RESPONSE_BODY,
-                                                  f"Validator produced validation error when validating response body. Error message:{str(e)}"))
+                            except ValidationError as e:
+                                self.anomalies.append(
+                                    Anomaly(entry,
+                                              AnomalyType.INVALID_RESPONSE_BODY,
+                                              f"Validator produced validation error when validating response body. Error message:{str(e)}"))
 
                         break
 
@@ -614,8 +596,6 @@ class Parameter:
 class Response:
     def __init__(self, code, schemas={}):
         self.code = code
-        # TODO: Make similar mimetype checks as requestbody does because openapi supports multiple schemas
-
         # TODO: Determine if also headers of response are to be analyzed
 
         # Possible schemas in mimetype -> schema dictionary
