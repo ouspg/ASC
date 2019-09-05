@@ -551,13 +551,12 @@ class AnomalyType(Enum):
     BROKEN_REQUEST_BODY = 3
     UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED = 4
     BROKEN_RESPONSE_BODY = 5
-    DEFAULT_RESPONSE_IS_NOT_USED = 6
-    INVALID_RESPONSE_BODY = 7
-    UNDEFINED_METHOD_OF_ENDPOINT = 8
-    UNMATCHED_REQUEST_BODY_MIMETYPE = 9
-# TODO: Should also invalid request body be added because there is both in responses too
-#  Consider validity of this anomaly approach
-# TODO: Consider sensibility of next 2 anomalies UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED DEFAULT_RESPONSE_IS_NOT_USED
+    INVALID_RESPONSE_BODY = 6
+    UNDEFINED_METHOD_OF_ENDPOINT = 7
+    UNMATCHED_REQUEST_BODY_MIMETYPE = 8
+
+# TODO: Consider sensibility of anomaly UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED
+
 
 class Anomaly:
     def __init__(self, entry, type, description):
