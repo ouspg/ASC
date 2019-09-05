@@ -78,15 +78,9 @@ class Endpoint:
         '''
 
         url_parsed = urlparse(url)
-        # TODO: Consider giving endpoint also server name and other stuff to filter out some weird ulrs
-
-        # TODO: Consider need of basepath and server because OA v3 can have multiple servers too
-
-        # Is basepath needed at all? end of url is the part which is compared anyway
-        # if server name remains most likely irrelevant this should not be problem
-        # And if weird special cases can be tolerated, this should be ok
-        # url.parsed.path, problem with endswith might be that it might match to something else too
-        # Like alsdkfj/aksldfj/pet to /pet
+        # TODO: Consider giving endpoint also server name and basepath for better path matching
+        #  This works for now but betterment is needed because some special cases will go wrong
+        #  Run unit tests to see which kind of cases will fail
 
         # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
@@ -276,19 +270,14 @@ class SingleMethod:
 
             for param in self.parameters:
                 if param.location == 'path':
-                    # TODO: Check if it even in theory possible that path parameter has schema
-                    # Yes, in oa v3 is possible but in 2 maybe not
-                    # Use new utility function now
+                    # Use own-writed parameter extractor until better is found/written
                     paramvalue = path_parameter_extractor(url, self.path, param.name)
 
-                    # Path parameter can not be empty
+                    # TODO: Path parameter should not be empty, ensure with checks
                     param.add_usage(paramvalue)
 
                 elif param.location == 'query':
-                    # TODO: Check if schema exists, and then validate parameter against it, otherwise do nothing
-                    #  Do same to other param types and possibly refactor this whole loop
                     # Check query parameters as default way
-                    # Is query params always required?
                     parameter_found = False
 
                     for queryparameter in entry['request']['queryString']:
@@ -420,7 +409,6 @@ class SingleMethod:
                         # Form parameters can be found in text field of HAR too, which case special parsing is required
                         # Parse multipart data from response with custom functions
 
-                        # TODO: Getting boundary and parsed data are so tightly connected that consider combining
                         # Have to make own decoder because requests_toolbelt.MultipartDecoder does not work!
                         bound = get_multipart_boundary(entry['request'])
                         parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
