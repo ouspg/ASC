@@ -176,15 +176,11 @@ class Endpoint:
 
 # Class for single method
 class SingleMethod:
-    def __init__(self, type, path, methodinfo, parameters, responses):
+    def __init__(self, type, path, unique_id, parameters, responses):
         self.type = type
         self.path = path
         self.parameters = parameters
-        # TODO: methot info never used... consider it again
-        self.methodinfo = methodinfo
-
-        # TODO: Add operation id, as it is also unique identifier if it is present
-
+        self.unique_id = unique_id
         self.responses = responses
 
         # Array of entries
@@ -780,6 +776,15 @@ class ASC:
                 params_operation = []
                 responses_operation = []
 
+                # Openapi V2 and V3 may provide API-wide unique operation id for method
+
+
+                method_unique_id = None
+
+                if 'operationId' in paths[endpoint][method].keys():
+                    method_unique_id = paths[endpoint][method]['operationId']
+
+
                 # Parameters of method
                 if 'parameters' in paths[endpoint][method].keys():
                     # Common parameters for endpoint exists
@@ -854,10 +859,8 @@ class ASC:
                 # Add all operation parameters to final array
                 params_final.extend(params_operation)
 
-                minfo = copy.deepcopy(paths[endpoint][method])
-
                 # Input responses and parameters to single method
-                mthds[method] = SingleMethod(method, endpoint, minfo, params_final, responses_operation)
+                mthds[method] = SingleMethod(method, endpoint, method_unique_id, params_final, responses_operation)
 
             # Create endpoint with list of method objects
             self.endpoints[endpoint] = (Endpoint(endpoint, mthds))
