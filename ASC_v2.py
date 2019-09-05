@@ -180,7 +180,10 @@ class SingleMethod:
         self.type = type
         self.path = path
         self.parameters = parameters
+        # TODO: methot info never used... consider it again
         self.methodinfo = methodinfo
+
+        # TODO: Add operation id, as it is also unique identifier if it is present
 
         self.responses = responses
 
@@ -491,8 +494,7 @@ class SingleMethod:
                     if resp.code == response_selection:
                         resp.add_usage(entry['response']['content']['text'])
 
-                        # TODO: Determine what to do with xml bodies, maybe auto detect and use XML validator
-                        # Now xml bodies produce JSON parsing error
+                        # Currently only limited json body validation is supported
 
                         response_mimetype = entry['response']['content']['mimeType']
 
@@ -525,7 +527,6 @@ class SingleMethod:
                                               AnomalyType.INVALID_RESPONSE_BODY,
                                               f"Validator produced validation error when validating response body. Error message:{str(e)}"))
 
-                            # TODO: Should this also catch some other errors?
                         break
 
         # Calculations of parameters and responses of this endpoint
@@ -580,7 +581,6 @@ class Anomaly:
         return anomaly_dictionary
 
 
-# TODO: Consider renaming this parameter class, as it handles now requestbodies too
 class Parameter:
     def __init__(self, name, location, required=False, schemas={}):
         self.name = name
@@ -620,13 +620,11 @@ class Parameter:
 class Response:
     def __init__(self, code, schemas={}):
         self.code = code
-        # TODO: Determine if also headers of response are to be analyzed
 
         # Possible schemas in mimetype -> schema dictionary
         self.schemas = schemas
 
         # Mimetype based schema
-
         self.usage_count = 0
         self.unique_body_values = set()
 
@@ -766,7 +764,6 @@ class ASC:
                         param_required = param['required']
 
                     param_schemas = {}
-                    # TODO: Reconsider if sensible to use wildcard here
                     if 'schema' in param:
                         param_schemas['*/*'] = param['schema']
                     # If content is in parameter, it will have very complex content and potentially multiple schemas
@@ -799,7 +796,6 @@ class ASC:
                         # Parameter can have only one schema
 
                         # Schema is in parameter which means it has only one schema
-                        # TODO: Reconsider if sensible to use wildcard here
                         if 'schema' in param:
                             param_schemas['*/*'] = param['schema']
                         # If content is in parameter, it will have very complex content and potentially multiple schemas
@@ -811,7 +807,6 @@ class ASC:
                                                           required=param_required,
                                                           schemas=param_schemas))
 
-                # TODO: Unify/combine this to similar code as above
                 # Handle OA V3 requestbody as simple body parameter
                 if 'requestBody' in paths[endpoint][method].keys():
                     param_schemas = {}
@@ -831,22 +826,17 @@ class ASC:
                                                       schemas=param_schemas))
 
                 # Responses of method
-                # TODO: Find out if there is for example api wide responses
-                #  because there is no endpoint wide responses
-                # TODO: Determine if headers object will be taken too
                 for code in paths[endpoint][method]['responses'].keys():
                     # Make multiple schema handling to be similar than in request schemas
                     response_schemas = {}
                     if 'schema' in paths[endpoint][method]['responses'][code].keys():
                         # OpenAPI V2, only 1 schema present
-                        # TODO: Consider if wildcard is sensible
                         response_schemas['*/*'] = paths[endpoint][method]['responses'][code]['schema']
 
                     elif 'content' in paths[endpoint][method]['responses'][code].keys():
                         # Openapi V3, possibly multiple schemas present
                         for media_type, media_object in paths[endpoint][method]['responses'][code]['content'].items():
                             if 'schema' in media_object:
-                                # TODO: Consider what to do with empty schemas
                                 response_schemas[media_type] = media_object['schema']
 
                     responses_operation.append(Response(code, schemas=response_schemas))
