@@ -353,50 +353,48 @@ class SingleMethod:
                                         param.name) + " was not found in request body"
                                     ))
                     else:
-                        # Add body parameter usage
+                        # Add body parameter usage if it is not empty and star analyzing schema
                         param.add_usage(paramvalue)
 
-                    # TODO: Should jump out if body is missing?
-
-                    try:
-                        ins = json.loads(paramvalue)
-                    except json.JSONDecodeError as e:
-                        # Add anomaly
-                        self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
-                                                            "Could not parse sent data object in body to json object." +
-                                                            f"Error message: {str(e)}"))
-
-                    else:
-                        # Select schema from options based on postdata mimetype
-                        postdata_mimetype = entry['request']['postData']['mimeType']
-
-                        # TODO: Body should have at least schema object
-                        #  Consider making anomaly if schema is not found in spec and do not continue body analysis
-
-                        # Schema selection code
-                        selected_schema = find_best_mimetype_match_for_content_header(param.schemas.keys(), postdata_mimetype)
-
-                        # If there was no schema
-                        if not selected_schema:
-                            self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
-                                                         f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
+                        try:
+                            ins = json.loads(paramvalue)
+                        except json.JSONDecodeError as e:
+                            # Add anomaly
+                            self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
+                                                                "Could not parse sent data object in body to json object." +
+                                                                f"Error message: {str(e)}"))
 
                         else:
-                            # Load schema which was found
-                            sch = json.loads(json.dumps(param.schemas[selected_schema]))
+                            # Select schema from options based on postdata mimetype
+                            postdata_mimetype = entry['request']['postData']['mimeType']
 
-                            try:
-                                validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
-                            except ValidationError as e:
-                                self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
-                                                                           "Validator produced error when validating this request body" +
-                                                                            f"Error {str(e)}"
-                                                              ))
-                            except json.decoder.JSONDecodeError as e:
-                                self.anomalies.append(
-                                    Anomaly(entry,
-                                            AnomalyType.BROKEN_REQUEST_BODY,
-                                            f"JSON parsing error when parsing request body. Error message:{str(e)}"))
+                            # TODO: Body should have at least schema object
+                            #  Consider making anomaly if schema is not found in spec and do not continue body analysis
+
+                            # Schema selection code
+                            selected_schema = find_best_mimetype_match_for_content_header(param.schemas.keys(), postdata_mimetype)
+
+                            # If there was no schema
+                            if not selected_schema:
+                                self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
+                                                             f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
+
+                            else:
+                                # Load schema which was found
+                                sch = json.loads(json.dumps(param.schemas[selected_schema]))
+
+                                try:
+                                    validate(instance=ins, schema=sch, cls=validators.Draft4Validator)
+                                except ValidationError as e:
+                                    self.anomalies.append(Anomaly(entry, AnomalyType.BROKEN_REQUEST_BODY,
+                                                                               "Validator produced error when validating this request body" +
+                                                                                f"Error {str(e)}"
+                                                                  ))
+                                except json.decoder.JSONDecodeError as e:
+                                    self.anomalies.append(
+                                        Anomaly(entry,
+                                                AnomalyType.BROKEN_REQUEST_BODY,
+                                                f"JSON parsing error when parsing request body. Error message:{str(e)}"))
 
                 elif param.location == 'formData':
                     # Form data parameters can be found either params field or content field in HAR
