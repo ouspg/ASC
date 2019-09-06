@@ -5,7 +5,7 @@ API name: OpenAPI Petstore
 API version: 1.0.0
 API description: This is a sample server Petstore server. For this sample, you can use the api key `special-key` to test the authorization filters. For OAuth2 flow, you may use `user` as both username and password when asked to login.
 
-Analysis initiated: 13:44:38 11.06.2019
+Analysis initiated: 13:21:46 25.06.2019
 
 HAR file first timestamp: TBA
 
@@ -29,6 +29,7 @@ Total number of parameters: TBA
 Total number of parameters used: TBA
 
 PASS/FAIL analysis TBA if needed
+Analysis started with command line command: TBA
 Passed: TBA
 Coverage level given: TBA
 Endpoints excluded: TBA
@@ -90,8 +91,8 @@ Endpoint: /pet
             
         Anomalies:
             
-                Description: 
-                Entry: 
+                Description: Response code 200 is not explictly defined in API specification, and default response is not present
+                Entry: {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:46:55.891+03:00', 'request': {'method': 'PUT', 'url': 'http://localhost/v3/pet', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Content-Type', 'value': 'application/json'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'Content-Length', 'value': '172'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'postData': {'mimeType': 'application/json', 'text': '{"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":4,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}', 'comment': ''}, 'headersSize': 366, 'bodySize': 172, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:46:56 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 12, 'wait': 670, 'receive': 27, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 711}
             
 
         Logs:
@@ -128,8 +129,11 @@ Endpoint: /pet
             
         Anomalies:
             
-                Description: 
-                Entry: 
+                Description: Response code 200 is not explictly defined in API specification, and default response is not present
+                Entry: {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:47:17.886+03:00', 'request': {'method': 'POST', 'url': 'http://localhost/v3/pet', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Content-Type', 'value': 'application/json'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'Content-Length', 'value': '172'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'postData': {'mimeType': 'application/json', 'text': '{"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":9,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}', 'comment': ''}, 'headersSize': 367, 'bodySize': 172, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:47:17 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 22, 'receive': 2, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 25}
+            
+                Description: Response code 200 is not explictly defined in API specification, and default response is not present
+                Entry: {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:47:27.104+03:00', 'request': {'method': 'POST', 'url': 'http://localhost/v3/pet', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Content-Type', 'value': 'application/json'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'Content-Length', 'value': '172'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'postData': {'mimeType': 'application/json', 'text': '{"photoUrls":["photoUrls","photoUrls"],"name":"doggie","id":9,"category":{"name":"name","id":6},"tags":[{"name":"name","id":1},{"name":"name","id":1}],"status":"available"}', 'comment': ''}, 'headersSize': 367, 'bodySize': 172, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:47:27 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 0, 'wait': 106, 'receive': 0, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 107}
             
 
         Logs:
@@ -184,9 +188,6 @@ Endpoint: /pet/findByStatus
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -235,9 +236,6 @@ Endpoint: /pet/findByTags
                 
             
         Anomalies:
-            
-                Description: 
-                Entry: 
             
 
         Logs:
@@ -304,9 +302,6 @@ Endpoint: /pet/{petId}
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -350,12 +345,6 @@ Endpoint: /pet/{petId}
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -397,11 +386,8 @@ Endpoint: /pet/{petId}
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
-                Description: 
-                Entry: 
+                Description: Response code 200 is not explictly defined in API specification, and default response is not present
+                Entry: {'pageref': 'Page 0', 'startedDateTime': '2019-04-21T16:48:54.648+03:00', 'request': {'method': 'DELETE', 'url': 'http://localhost/v3/pet/555', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Host', 'value': 'localhost'}, {'name': 'User-Agent', 'value': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0'}, {'name': 'Accept', 'value': '*/*'}, {'name': 'Accept-Language', 'value': 'en-US,en;q=0.5'}, {'name': 'Accept-Encoding', 'value': 'gzip, deflate'}, {'name': 'Referer', 'value': 'http://localhost/'}, {'name': 'Origin', 'value': 'http://localhost'}, {'name': 'DNT', 'value': '1'}, {'name': 'Connection', 'value': 'keep-alive'}], 'queryString': [], 'headersSize': 320, 'bodySize': 0, 'comment': ''}, 'response': {'status': 200, 'statusText': '', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Content-Length', 'value': '0'}, {'name': 'Date', 'value': 'Sun, 21 Apr 2019 13:48:54 GMT'}], 'content': {'size': 0, 'mimeType': '', 'text': '', 'encoding': 'base64', 'comment': ''}, 'redirectURL': '', 'headersSize': 75, 'bodySize': 0, 'comment': ''}, 'cache': {}, 'timings': {'comment': '', 'send': 13, 'wait': 98, 'receive': 0, 'ssl': -1, 'connect': -1, 'blocked': -1, 'dns': -1}, 'serverIPAddress': '127.0.0.1', 'comment': '', 'time': 112}
             
 
         Logs:
@@ -453,12 +439,6 @@ Endpoint: /pet/{petId}/uploadImage
                 
             
         Anomalies:
-            
-                Description: 
-                Entry: 
-            
-                Description: 
-                Entry: 
             
 
         Logs:
@@ -546,9 +526,6 @@ Endpoint: /store/order
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -610,9 +587,6 @@ Endpoint: /store/order/{orderId}
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -653,9 +627,6 @@ Endpoint: /store/order/{orderId}
                 
             
         Anomalies:
-            
-                Description: 
-                Entry: 
             
 
         Logs:
@@ -698,9 +669,6 @@ Endpoint: /user
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -742,9 +710,6 @@ Endpoint: /user/createWithArray
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -785,9 +750,6 @@ Endpoint: /user/createWithList
                 
             
         Anomalies:
-            
-                Description: 
-                Entry: 
             
 
         Logs:
@@ -841,9 +803,9 @@ Endpoint: /user/login
                 Usage count: 3
                 Unique values: 2
                 
-                    d
-                
                     dss
+                
+                    d
                 
             
             Parameter name: password
@@ -859,12 +821,6 @@ Endpoint: /user/login
                 
             
         Anomalies:
-            
-                Description: 
-                Entry: 
-            
-                Description: 
-                Entry: 
             
 
         Logs:
@@ -962,9 +918,6 @@ Endpoint: /user/{username}
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -1012,12 +965,6 @@ Endpoint: /user/{username}
             
         Anomalies:
             
-                Description: 
-                Entry: 
-            
-                Description: 
-                Entry: 
-            
 
         Logs:
             
@@ -1056,9 +1003,6 @@ Endpoint: /user/{username}
                 
             
         Anomalies:
-            
-                Description: 
-                Entry: 
             
 
         Logs:
