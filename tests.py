@@ -25,7 +25,9 @@ class EndpointMatchUrlToPathCases(TestCase):
     def test_nopath_params(self):
         trueurls = [
             'http://localhost/v3/pet/somestaticendpoint',
-            'http://localhost/v3/pet/somestaticendpoint/'
+            'http://localhost/v3/pet/somestaticendpoint/',
+            'http://localhost:80/v3/pet/somestaticendpoint',
+            'http://localhost:80/v3/pet/somestaticendpoint/'
         ]
 
         # Leaving double slash test later if needed
@@ -38,7 +40,8 @@ class EndpointMatchUrlToPathCases(TestCase):
             'http://localhost/v3/pet/somestaticendpoint/somestaticendpoint',
             'http://localhost/v3/pet/somestaticendpoint/pet/somestaticendpoint',
             'http://localhost/v3/pet/pet/somestaticendpoint',
-            'http://localhost/v3/pet/somestaticendpoint///localhost/v3/pet/somestaticendpoint'
+            'http://localhost/v3/pet/somestaticendpoint///localhost/v3/pet/somestaticendpoint',
+            'http://localhost:8080/v3/pet/somestaticendpoint',
         ]
 
         for expectrueurl in trueurls:
