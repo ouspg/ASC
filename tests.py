@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-from ASC_v2 import Endpoint
-from ASC_v2 import path_parameter_extractor
+from ASC import Endpoint
+from ASC import path_parameter_extractor
 
 
 class EndpointMatchUrlToPathCases(TestCase):
