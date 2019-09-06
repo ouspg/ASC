@@ -20,7 +20,7 @@ import time
 
 import configparser
 
-# from requests_toolbelt.multipart import decoder
+from requests_toolbelt.multipart import decoder
 
 from utils import TerminalColors, get_multipart_boundary, decode_multipart, path_parameter_extractor, find_best_mimetype_match_for_content_header
 
@@ -410,14 +410,54 @@ class SingleMethod:
                         # Parse multipart data from response with custom functions
 
                         # Have to make own decoder because requests_toolbelt.MultipartDecoder does not work!
-                        bound = get_multipart_boundary(entry['request'])
-                        parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
+                        # One more try with multipart decoder
 
-                        parameter_found = False
-                        for p_name, paramvalue in parseddata:
-                            if p_name == param.name:
-                                param.add_usage(paramvalue)
+                        # Try form parsing with multipart decoder
+
+                        # TODO: Do comment cleanups, ensure working, remove custom decoder from utils
+
+                        # TODO: Determine action if content type not found
+                        ct = ""
+                        for header in entry['request']['headers']:
+                            if header['name'] == 'content-type':
+                                ct = header['value']
+                                break
+                        #ct = entry['request']['headers']['name']['content-type']
+                        texcontent = bytes(entry['request']['postData']['text'], encoding='utf-8')
+                        #print(ct)
+                        #print(texcontent)
+                        #texcontent = b"asdfasdfsadf"
+
+                        #print(type(texcontent))
+                        #print(type(ct))
+
+
+                        dc = decoder.MultipartDecoder(texcontent, ct)
+
+
+                        for part in dc.parts:
+                            # TODO: Ensure that "filename is not actually selected
+                            #print(part.headers['content-type'])
+                            #print(part.headers.get('Content-Disposition'))
+                            #print(part.headers.items())
+                            key_for_dict = b'Content-Disposition'
+                            print(part.headers[key_for_dict])
+                            header_name = re.search('name="(.*?)"', str(part.headers[key_for_dict])).group(1)
+                            if header_name == param.name:
+
+                                param.add_usage(part.text)
                                 parameter_found = True
+                                #print(part.headers)
+                                #print(part.text)
+
+                        #bound = get_multipart_boundary(entry['request'])
+                        #parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
+
+                        #parameter_found = False
+                        #for p_name, paramvalue in parseddata:
+                        #    if p_name == param.name:
+                        #        param.add_usage(paramvalue)
+                        #        parameter_found = True
 
                         if not parameter_found and param.required:
                             # Make required parameter not found anomaly
