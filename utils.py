@@ -12,40 +12,6 @@ class TerminalColors:
     ENDC = '\033[0m'
 
 
-# TODO: consider that those 2 functions could be tied together somehow
-def get_multipart_boundary(req_entry):
-    for header in req_entry['headers']:
-        if header['name'] == 'content-type':
-            boundarysearch = re.search('boundary=(.*?)( |$)', header['value'])
-            boundvalue = boundarysearch.group(1)
-            return boundvalue
-
-
-# TODO: This works for now, but later more sophisticated multipart decoder might be needed
-def decode_multipart(text, boundary):
-    # Returns array of tuple name-value pairs
-    splitted_text = text.split(boundary)
-
-    actual_items = []
-
-    for item in splitted_text:
-        if item == '--' or item == '--\r\n':
-            continue
-        actual_items.append(item)
-
-    parsed_items = []
-
-    for a_item in actual_items:
-        namesearch = re.search('name="(.*?)"', a_item)
-        namevalue = namesearch.group(1)
-        valuesearch = re.search('\r\n\r\n([\s\S]*)\r\n', a_item)
-        valuevalue = valuesearch.group(1)
-
-        parsed_items.append((namevalue, valuevalue))
-
-    return parsed_items
-
-
 def path_parameter_extractor(url, path, parameter_name):
 
     if path.find('{' + parameter_name + '}') != -1:

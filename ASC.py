@@ -407,57 +407,34 @@ class SingleMethod:
 
                     elif 'text' in entry['request']['postData']:
                         # Form parameters can be found in text field of HAR too, which case special parsing is required
-                        # Parse multipart data from response with custom functions
-
-                        # Have to make own decoder because requests_toolbelt.MultipartDecoder does not work!
-                        # One more try with multipart decoder
-
-                        # Try form parsing with multipart decoder
-
-                        # TODO: Do comment cleanups, ensure working, remove custom decoder from utils
+                        # Parsing form data with toolbelt.MultipartDecoder
+                        parameter_found = False
 
                         # TODO: Determine action if content type not found
-                        ct = ""
+                        postdata_contenttype = ""
                         for header in entry['request']['headers']:
                             if header['name'] == 'content-type':
-                                ct = header['value']
+                                postdata_contenttype = header['value']
                                 break
-                        #ct = entry['request']['headers']['name']['content-type']
-                        texcontent = bytes(entry['request']['postData']['text'], encoding='utf-8')
-                        #print(ct)
-                        #print(texcontent)
-                        #texcontent = b"asdfasdfsadf"
 
-                        #print(type(texcontent))
-                        #print(type(ct))
+                        # Multipartdecoder wants content to be bytestring
+                        form_postdata_textcontent = bytes(entry['request']['postData']['text'], encoding='utf-8')
 
-
-                        dc = decoder.MultipartDecoder(texcontent, ct)
-
+                        dc = decoder.MultipartDecoder(form_postdata_textcontent, postdata_contenttype)
 
                         for part in dc.parts:
-                            # TODO: Ensure that "filename is not actually selected
-                            #print(part.headers['content-type'])
-                            #print(part.headers.get('Content-Disposition'))
-                            #print(part.headers.items())
+                            # Parse name field out of content-disposition
                             key_for_dict = b'Content-Disposition'
-                            print(part.headers[key_for_dict])
-                            header_name = re.search('name="(.*?)"', str(part.headers[key_for_dict])).group(1)
-                            if header_name == param.name:
+                            header_values = part.headers[key_for_dict].split(b"; ")
+                            name = ""
+                            for header_value in header_values:
+                                if header_value.startswith(b'name="'):
+                                    name = re.search('name="(.*?)"', str(header_value)).group(1)
 
+                            if name == param.name:
                                 param.add_usage(part.text)
                                 parameter_found = True
-                                #print(part.headers)
-                                #print(part.text)
-
-                        #bound = get_multipart_boundary(entry['request'])
-                        #parseddata = decode_multipart(str(entry['request']['postData']['text']), bound)
-
-                        #parameter_found = False
-                        #for p_name, paramvalue in parseddata:
-                        #    if p_name == param.name:
-                        #        param.add_usage(paramvalue)
-                        #        parameter_found = True
+                                break
 
                         if not parameter_found and param.required:
                             # Make required parameter not found anomaly
@@ -468,7 +445,6 @@ class SingleMethod:
                                         ))
 
             # Analyzing responses
-
             response_code = str(entry['response']['status'])
             response_code_found_explicit_definition = False
             response_code_found_range_definition = False
