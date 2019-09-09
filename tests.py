@@ -11,12 +11,12 @@ class EndpointMatchUrlToPathCases(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.testendpoint1 = Endpoint('/pet/somestaticendpoint', [], "/v3")
+        cls.testendpoint1 = Endpoint('/pet/somestaticendpoint', [], server_address="localhost", basepath="/v3")
 
-        cls.testendpoint2 = Endpoint('/pet/somestaticthing/{petId}', [], "/v3")
+        cls.testendpoint2 = Endpoint('/pet/somestaticthing/{petId}', [], server_address="localhost", basepath="/v3")
 
-        cls.testtendpoint3_1 = Endpoint('/pet/{ownerId}/{petId}', [], "/v3")
-        cls.testtendpoint3_2 = Endpoint('/pet/{ownerId}/somestaticthing/{petId}', [], "/v3")
+        cls.testtendpoint3_1 = Endpoint('/pet/{ownerId}/{petId}', [], server_address="localhost", basepath="/v3")
+        cls.testtendpoint3_2 = Endpoint('/pet/{ownerId}/somestaticthing/{petId}', [], server_address="localhost", basepath="/v3")
 
     @classmethod
     def tearDownClass(cls):
@@ -25,9 +25,7 @@ class EndpointMatchUrlToPathCases(TestCase):
     def test_nopath_params(self):
         trueurls = [
             'http://localhost/v3/pet/somestaticendpoint',
-            'http://localhost/v3/pet/somestaticendpoint/',
-            'http://localhost:80/v3/pet/somestaticendpoint',
-            'http://localhost:80/v3/pet/somestaticendpoint/'
+            'https://localhost/v3/pet/somestaticendpoint'
         ]
 
         # Leaving double slash test later if needed
@@ -42,6 +40,10 @@ class EndpointMatchUrlToPathCases(TestCase):
             'http://localhost/v3/pet/pet/somestaticendpoint',
             'http://localhost/v3/pet/somestaticendpoint///localhost/v3/pet/somestaticendpoint',
             'http://localhost:8080/v3/pet/somestaticendpoint',
+            'http://localhost:80/v3/pet/somestaticendpoint',
+            'http://localhost:80/v3/pet/somestaticendpoint/',
+            'http://localhost/v3/pet/somestaticendpoint/',
+            'https://localhost/v3/pet/somestaticendpoint/'
         ]
 
         for expectrueurl in trueurls:
@@ -56,7 +58,8 @@ class EndpointMatchUrlToPathCases(TestCase):
         trueurls = [
             'http://localhost/v3/pet/somestaticthing/somestaticthing',
             'http://localhost/v3/pet/somestaticthing/98765',
-            'http://localhost/v3/pet/somestaticthing/98765/'
+            'http://localhost/v3/pet/somestaticthing/',
+            'https://localhost/v3/pet/somestaticthing/98765'
         ]
 
         # Leave out double slash tests for now
@@ -65,10 +68,11 @@ class EndpointMatchUrlToPathCases(TestCase):
         falseurls = [
             'http://localhost/v3/pet/somestaticthing/somestaticthing///localhost/v3/pet/somestaticthing/somestaticthing',
             'http://localhost/v3/pet/somestaticthing/888/somestaticthing',
-            'http://localhost/v3/pet/somestaticthing/',
+            'http://localhost/v3/v3/pet/somestaticthing/',
             'http://localhost/v3/pet/somestaticthing',
             'http://localhost/v3/pet/pet/somestaticthing/888',
-            'http://localhost/v3/pet/somestaticthing///localhost/v3/pet/somestaticthing/98765'
+            'http://localhost/v3/pet/somestaticthing///localhost/v3/pet/somestaticthing/98765',
+            'https://localhost:8080/v3/pet/somestaticthing/98765'
         ]
 
         for expectrueurl in trueurls:
@@ -83,7 +87,7 @@ class EndpointMatchUrlToPathCases(TestCase):
         trueurls = [
             'http://localhost/v3/pet/someparameter/someotherparam',
             'http://localhost/v3/pet/0988765/98765',
-            'http://localhost/v3/pet/somestaticthing/98765/'
+            'http://localhost/v3/pet/somestaticthing/'
         ]
         # Leave out double slash tests
         # 'https://localhost/v3///pet//somestaticthing//98765'
@@ -91,10 +95,17 @@ class EndpointMatchUrlToPathCases(TestCase):
         falseurls = [
             'http://localhost/v3/pet/somestaticthing/somestaticthing///localhost/v3/pet/somestaticthing/some/somestaticthing',
             'http://localhost/v3/pet/somestaticthing/888/somestaticthing',
-            'http://localhost/v3/pet/somestaticthing/',
             'http://localhost/v3/pet/somestaticthing',
             'http://localhost/v3/pet/pet/somestaticthing/888',
-            'http://localhost/v3/pet/somestaticthing///localhost/v3/pet/somestaticthing/98765'
+            'http://localhost/v3/pet/somestaticthing///localhost/v3/pet/somestaticthing/98765',
+            'http://localhost/v3/pet/somestaticthing/98765/',
+            'http://localhost/v3/pet/somestaticthing/98765/someunneccessarything',
+            'http://localhost/v3/pet/somestaticthing/98765/someunneccessarything/',
+            'http://localhost/v4/v3/pet/someparameter/someotherparam',
+            'http://localhost/sv3/pet/0988765/98765',
+            'http://localhost:81/v3/pet/someparameter/someotherparam',
+            'http://localhost/v3/pet/pet/0988765/98765',
+            'http://localhost/v3/pet/somestaticthing/123456/v3/pet/somestaticthing/123456'
         ]
 
         for expectrueurl in trueurls:
@@ -109,8 +120,7 @@ class EndpointMatchUrlToPathCases(TestCase):
     def test_2_path_parameter_set2(self):
         trueurls = [
             'http://localhost/v3/pet/someparameter/somestaticthing/somepathparam',
-            'http://localhost/v3/pet/0988765/somestaticthing/0909',
-            'http://localhost/v3/pet/88888/somestaticthing/98765/'
+            'http://localhost/v3/pet/0988765/somestaticthing/0909'
         ]
         # Leave out double slash tests
         # 'https://localhost/v3///pet//someparam//somestaticthing//98765'
@@ -120,8 +130,10 @@ class EndpointMatchUrlToPathCases(TestCase):
             'http://localhost/v3/pet/somestaticthing/888/somestaticthing',
             'http://localhost/v3/pet/somestaticthing/9898',
             'http://localhost/v3/pet/somestaticthing',
+            'http://localhost/pet/somestaticthing/pet/somestaticthing',
             'http://localhost/v3/pet/pet/somestaticthing/somestaticthing/888',
-            'http://localhost/v3/pet/somestaticthing///localhost/v3/pet/somestaticthing/98765'
+            'http://localhost/v3/pet/somestaticthing///localhost/v3/pet/somestaticthing/98765',
+            'http://localhost/v3/pet/88888/somestaticthing/98765/'
         ]
 
         for expectrueurl in trueurls:

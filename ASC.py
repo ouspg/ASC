@@ -22,16 +22,21 @@ import configparser
 
 from requests_toolbelt.multipart import decoder
 
-from utils import TerminalColors, get_multipart_boundary, decode_multipart, path_parameter_extractor, find_best_mimetype_match_for_content_header
+from utils import TerminalColors, path_parameter_extractor, find_best_mimetype_match_for_content_header
 
 
 class Endpoint:
-    def __init__(self, path, methods, baseurl="", excluded=False):
+    def __init__(self, path, methods, server_address="", basepath="", excluded=False):
         self.path = path
         self.methods = methods
         # Baseurl needed to eliminate changes for some weird urls in har to map incorrectly
         # Should also server url be specified?
-        self.baseurl = baseurl
+
+        self.server_address = server_address
+        self.basepath = basepath
+
+        # TODO: Remove baseurl field
+        #self.baseurl = baseurl
         self.usage_count = 0
         self.excluded = excluded
 
@@ -78,10 +83,61 @@ class Endpoint:
         '''
 
         url_parsed = urlparse(url)
-        # TODO: Consider giving endpoint also server name and basepath for better path matching
-        #  This works for now but betterment is needed because some special cases will go wrong
-        #  Run unit tests to see which kind of cases will fail
 
+        # TODO: Kinda needs difference between basepath empty vs basepath not provided...
+        # TODO: Think if needed to develop in situations when server and basepath are not given
+
+        if '{' in self.path and '}' in self.path:
+            # Path variable(s) exists
+
+            # Server address exists
+            if self.server_address != "":
+                endpoint_path_to_compare = self.server_address + self.basepath + self.path
+                url_path_to_compare = url_parsed.netloc + url_parsed.path
+
+                # Take full match
+                # No trailing slashes allowed
+                search_pattern = "^" + re.sub('{.+?}', '[^/]*?', endpoint_path_to_compare) + "$"
+                # search_pattern = "^" + re.sub('{.+?}', '[^/]+?', endpoint_path_to_compare) + "[/]?$"
+
+                if re.search(search_pattern, url_path_to_compare):
+                    return True
+            else:
+                endpoint_path_to_compare = self.basepath + self.path
+                url_path_to_compare = url_parsed.path
+
+                # Strict matching, do not allow trailing slash
+                # Take full match from path
+                # search_pattern = re.sub('{.+?}', '[^/]+?', endpoint_path_to_compare) + "[/]?$"
+                search_pattern = re.sub('{.+?}', '[^/]*?', endpoint_path_to_compare) + "$"
+
+                if re.search(search_pattern, url_path_to_compare):
+                    return True
+        else:
+            # Plain matching possible
+
+            # Server address available, try full path match
+            if self.server_address != "":
+                endpoint_path_to_compare = self.server_address + self.basepath + self.path
+                url_path_to_compare = url_parsed.netloc + url_parsed.path
+
+                # Lets go with strict matching, no trailing slash is accepted
+                if endpoint_path_to_compare == url_path_to_compare:
+                    return True
+                else:
+                    return False
+            else:
+                # Match with endswith
+                endpoint_path_to_compare = self.basepath + self.path
+                url_path_to_compare = url_parsed.path
+
+                if endpoint_path_to_compare == url_path_to_compare:
+                    return True
+                else:
+                    return False
+
+        return False
+        '''
         # Is there some other smarter way to test path params than just looking for brackets?
         if '{' in self.path and '}' in self.path:
             # Create search pattern by replacing path parameter with 'anything-but-slash' wildcard
@@ -111,7 +167,7 @@ class Endpoint:
                         return True
                 else:
                     return True
-
+        '''
         # No match found
         return False
 
@@ -662,7 +718,8 @@ class ParameterCoverageLevel(Enum):
 
 class ASC:
     def __init__(self, apispec_addr, har_addr, endpoints_excluded, coverage_level_required,
-                 parameter_coverage_level_required, anomaly_types_causing_crash):
+                 parameter_coverage_level_required, anomaly_types_causing_crash, server_address,
+                 server_basepath):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
 
@@ -670,7 +727,10 @@ class ASC:
         self.harobject = ""
 
         self.endpoints = {}
-        self.basepath = ""
+
+        # Currently supporting only one server and basepath
+        self.server_address = server_address
+        self.server_basepath = server_basepath
 
         self.endpoints_excluded = endpoints_excluded
 
@@ -863,8 +923,10 @@ class ASC:
                 # Input responses and parameters to single method
                 mthds[method] = SingleMethod(method, endpoint, method_unique_id, params_final, responses_operation)
 
+            # TODO: Separate adder function? And also getter functions?, no loops would be required...
+            # TODO: Check this, why tuple like?, why no excluded?
             # Create endpoint with list of method objects
-            self.endpoints[endpoint] = (Endpoint(endpoint, mthds))
+            self.endpoints[endpoint] = (Endpoint(endpoint, mthds, server_address=self.server_address, basepath=self.server_basepath))
 
     def preprocess_har_entries(self):
         # Classify and filter out har entries to correct endpoints to wait for analysis
@@ -1217,11 +1279,18 @@ def main():
     for ee in exclude_endpoints_config.split(','):
         exclude_endpoints.append(ee)
 
+    # Get server and basepath from configuration file
+    # If not found, empty string should be default
+    server_serveraddress = config.get('SERVER_AND_BASEPATH', 'serveraddress', fallback="")
+    server_basepath = config.get('SERVER_AND_BASEPATH', 'basepath', fallback="")
+
     asc = ASC(args.apispec, args.harfile,
               coverage_level_required=api_coverage_level,
               endpoints_excluded=exclude_endpoints,
               parameter_coverage_level_required=parameter_coverage_level,
-              anomaly_types_causing_crash=critical_anomalies)
+              anomaly_types_causing_crash=critical_anomalies,
+              server_address=server_serveraddress,
+              server_basepath=server_basepath)
 
     asc.read_api_specification()
     asc.read_har_file()
