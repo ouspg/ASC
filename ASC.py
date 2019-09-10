@@ -247,6 +247,7 @@ class SingleMethod:
 
     def get_as_dictionary(self):
         singlemethod_dictionary = {
+            'method_unique_id': self.unique_id,
             'logs': self.logs,
             'usage_count': self.get_usage_count(),
             'anomalies': [],
@@ -896,6 +897,10 @@ class ASC:
         # Classify and filter out har entries to correct endpoints to wait for analysis
 
         # Determine if any endpoint matches to har entry url and add entry to endpoint if match is found
+
+        # Pages field is optional in har specification
+        # But Haralyzer promises to handle this situation by creating "fake page" which contains all such entries
+        # So this code should work anyway
 
         for page in self.harobject.pages:
             for entry in page.entries:
