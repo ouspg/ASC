@@ -292,11 +292,17 @@ class SingleMethod:
 
             for param in self.parameters:
                 if param.location == 'path':
-                    # Use own-writed parameter extractor until better is found/written
+                    # Use self-written simple parameter extractor
                     paramvalue = path_parameter_extractor(url, self.path, param.name)
 
-                    # TODO: Path parameter should not be empty, ensure with checks
-                    param.add_usage(paramvalue)
+                    # If path parameter is empty, add anomaly because path parameter is always required
+                    if paramvalue == "":
+                        self.anomalies.append(Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                                  "Required parameter " + str(
+                                                      param.name) + " was not found in request path parameters"
+                                                  ))
+                    else:
+                        param.add_usage(paramvalue)
 
                 elif param.location == 'query':
                     # Check query parameters as default way
