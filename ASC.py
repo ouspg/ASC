@@ -26,7 +26,7 @@ from utils import TerminalColors, path_parameter_extractor, find_best_mimetype_m
 
 
 class Endpoint:
-    def __init__(self, path, methods, server_address="", basepath="", excluded=False):
+    def __init__(self, path, methods, server_address="", basepath=""):
         self.path = path
         self.methods = methods
         # Baseurl needed to eliminate changes for some weird urls in har to map incorrectly
@@ -35,10 +35,7 @@ class Endpoint:
         self.server_address = server_address
         self.basepath = basepath
 
-        # TODO: Remove baseurl field
-        #self.baseurl = baseurl
         self.usage_count = 0
-        self.excluded = excluded
 
         self.methods_count = len(self.methods)
         self.methods_used = 0
@@ -924,7 +921,6 @@ class ASC:
                 mthds[method] = SingleMethod(method, endpoint, method_unique_id, params_final, responses_operation)
 
             # TODO: Separate adder function? And also getter functions?, no loops would be required...
-            # TODO: Check this, why tuple like?, why no excluded?
             # Create endpoint with list of method objects
             self.endpoints[endpoint] = (Endpoint(endpoint, mthds, server_address=self.server_address, basepath=self.server_basepath))
 
