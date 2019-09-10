@@ -171,7 +171,9 @@ class PathParameterExtractionTests(TestCase):
     def test_1_path_parameter_set1(self):
         tests = [
             ("http://localhost/v3/pet/somestaticthing/999", "/pet/somestaticthing/{petId}", "petId", "999"),
-            ("http://localhost/v3/pet/somestaticthing/asdf", "/pet/somestaticthing/{petId}", "petId", "asdf")
+            ("http://localhost/v3/pet/somestaticthing/asdf", "/pet/somestaticthing/{petId}", "petId", "asdf"),
+            ("http://localhost/v3/pet/somestaticthing/", "/pet/somestaticthing/{petId}", "petId", ""),
+            ("http://localhost/4444", "/{petId}", "petId", "4444")
         ]
 
         for test in tests:

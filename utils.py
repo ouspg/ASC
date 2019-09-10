@@ -1,5 +1,5 @@
 import re
-
+from urllib.parse import urlparse
 # Colors from here https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
 
 
@@ -14,16 +14,16 @@ class TerminalColors:
 
 def path_parameter_extractor(url, path, parameter_name):
 
-    if path.find('{' + parameter_name + '}') != -1:
-        path_prepart = path.split('{' + parameter_name + '}')[0]
+    url_path = urlparse(url).path
 
-        # If second part exists
+    if path.find('{' + parameter_name + '}') != -1:
+        # Cut path until wanted parameter
+        path_prepart = path.split('{' + parameter_name + '}')[0]
 
         # Replace path parameters in prepath with no-slash wildcard
         path_prepart = re.sub('{.+?}', '[^/]+', path_prepart)
 
-        # TODO: Basic testing done, do couple more special cases
-        result = re.search(path_prepart + '(?P<path_parameter_value>.+?(?=/|$))', url)
+        result = re.search(path_prepart + '(?P<path_parameter_value>.+?(?=/|$))', url_path)
 
         # If no match, then return empty value
         if result is None:
