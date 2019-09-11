@@ -240,7 +240,8 @@ class SingleMethod:
         response_not_used = []
 
         for response in self.responses:
-            if (response.code != 'default') and (response.usage_count == 0):
+            if response.usage_count == 0:
+            #if (response.code != 'default') and (response.usage_count == 0):
                 response_not_used.append(response.code)
 
         return response_not_used
@@ -690,7 +691,7 @@ class ParameterCoverageLevel(Enum):
 
 class ASC:
     def __init__(self, apispec_addr, har_addr, endpoints_excluded, coverage_level_required,
-                 parameter_coverage_level_required, anomaly_types_causing_crash, server_address,
+                 parameter_coverage_level_required, coverage_level_default_response_as_normal_code, anomaly_types_causing_crash, server_address,
                  server_basepath):
         self.apispec_addr = apispec_addr
         self.har_addr = har_addr
@@ -708,6 +709,8 @@ class ASC:
 
         self.coverage_level_required = coverage_level_required
         self.parameter_coverage_level_required = parameter_coverage_level_required
+
+        self.coverage_default_response_as_normal_response = coverage_level_default_response_as_normal_code
 
         # Set passing of coverage and anomaly encounter initially true and later analysis can change it to false
         self.coverage_requirement_passed = True
@@ -1067,6 +1070,9 @@ class ASC:
                 for mtd in self.endpoints[endpoint].methods.keys():
                     responses_not_used = self.endpoints[endpoint].methods[mtd].get_responses_not_used()
                     for resp in responses_not_used:
+                        # If default response is treated like others, also it will cause coverage error
+                        if not self.coverage_default_response_as_normal_response and resp == 'default':
+                            continue
                         coverage_level_fulfilled = False
                         coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} response {resp} is not used")
 
@@ -1233,6 +1239,9 @@ def main():
     # Get coverage level, default in broken config situation is disabled coverage analysis
     api_coverage_level = ApiCoverageLevel[config.get('COVERAGE', 'api_coverage_level', fallback="COVERAGE_DISABLED")]
 
+    # Get wheter default response code is treated as other codes in coverage calculations
+    api_coverage_default_response_as_normal_response = config.getboolean('COVERAGE', 'default_response_as_normal', fallback=False)
+
     # Get parameter coverage level, if not specified, parameter coverage will be disabled
     parameter_coverage_level = ParameterCoverageLevel[config.get('COVERAGE', 'parameter_coverage_level', fallback="COVERAGE_DISABLED")]
 
@@ -1263,6 +1272,7 @@ def main():
               coverage_level_required=api_coverage_level,
               endpoints_excluded=exclude_endpoints,
               parameter_coverage_level_required=parameter_coverage_level,
+              coverage_level_default_response_as_normal_code=api_coverage_default_response_as_normal_response,
               anomaly_types_causing_crash=critical_anomalies,
               server_address=server_serveraddress,
               server_basepath=server_basepath)
