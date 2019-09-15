@@ -812,19 +812,18 @@ class ASC:
                 params_operation = []
                 responses_operation = []
 
+                method_object = paths[endpoint][method]
+
                 # Openapi V2 and V3 may provide API-wide unique operation id for method
-
-
                 method_unique_id = None
 
-                if 'operationId' in paths[endpoint][method].keys():
-                    method_unique_id = paths[endpoint][method]['operationId']
-
+                if 'operationId' in method_object.keys():
+                    method_unique_id = method_object['operationId']
 
                 # Parameters of method
-                if 'parameters' in paths[endpoint][method].keys():
+                if 'parameters' in method_object.keys():
                     # Common parameters for endpoint exists
-                    for param in paths[endpoint][method]['parameters']:
+                    for param in method_object['parameters']:
                         param_required = False
                         param_schemas = {}
 
@@ -849,16 +848,16 @@ class ASC:
                                                           schemas=param_schemas))
 
                 # Handle OA V3 requestbody as simple body parameter
-                if 'requestBody' in paths[endpoint][method].keys():
+                if 'requestBody' in method_object.keys():
                     param_schemas = {}
-                    for media_type, media_object in paths[endpoint][method]['requestBody']['content'].items():
+                    for media_type, media_object in method_object['requestBody']['content'].items():
                         if 'schema' in media_object:
                             param_schemas[media_type] = media_object['schema']
 
                     # Request body may be required or not, defaults to not (according to OA V3 spec)
                     param_required = False
-                    if 'required' in paths[endpoint][method]['requestBody']:
-                        if paths[endpoint][method]['requestBody']['required']:
+                    if 'required' in method_object['requestBody']:
+                        if method_object['requestBody']['required']:
                             param_required = True
 
                     # This is named as requestbody, but treated as body in analysis
@@ -867,16 +866,16 @@ class ASC:
                                                       schemas=param_schemas))
 
                 # Responses of method
-                for code in paths[endpoint][method]['responses'].keys():
+                for code in method_object['responses'].keys():
                     # Make multiple schema handling to be similar than in request schemas
                     response_schemas = {}
-                    if 'schema' in paths[endpoint][method]['responses'][code].keys():
+                    if 'schema' in method_object['responses'][code].keys():
                         # OpenAPI V2, only 1 schema present
-                        response_schemas['*/*'] = paths[endpoint][method]['responses'][code]['schema']
+                        response_schemas['*/*'] =  method_object['responses'][code]['schema']
 
-                    elif 'content' in paths[endpoint][method]['responses'][code].keys():
+                    elif 'content' in method_object['responses'][code].keys():
                         # Openapi V3, possibly multiple schemas present
-                        for media_type, media_object in paths[endpoint][method]['responses'][code]['content'].items():
+                        for media_type, media_object in method_object['responses'][code]['content'].items():
                             if 'schema' in media_object:
                                 response_schemas[media_type] = media_object['schema']
 
@@ -898,7 +897,6 @@ class ASC:
                 # Input responses and parameters to single method
                 mthds[method] = SingleMethod(method, endpoint, method_unique_id, params_final, responses_operation)
 
-            # TODO: Separate adder function? And also getter functions?, no loops would be required...
             # Create endpoint with list of method objects
             self.endpoints[endpoint] = (Endpoint(endpoint, mthds, server_address=self.server_address, basepath=self.server_basepath))
 
