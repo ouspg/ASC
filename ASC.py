@@ -750,7 +750,8 @@ class ASC:
 
     def read_har_file(self):
         # Initialize har parser object
-        with open(self.har_addr, 'r') as f:
+        # Har specification demands file to be encoded with UTF-8
+        with open(self.har_addr, 'r', encoding="utf-8") as f:
             self.harobject = HarParser(json.loads(f.read()))
 
     def read_api_specification(self):
