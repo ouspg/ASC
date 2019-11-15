@@ -359,8 +359,15 @@ class SingleMethod:
                 elif param.location == 'body':
                     # Checks and validates body content of request and treats it as one parameter
                     # Openapi V3 does not have body parameter and it is replaced by 'requestBody' object
-                    paramvalue = entry['request']['postData']['text']
-                    param.add_usage(paramvalue)
+
+                    # Some traffic capture tools do not include post data even if it have existed
+                    # In this case, it will be treated similarly than there would be only empty requestbody
+                    paramvalue = ''
+                    try:
+                        paramvalue = entry['request']['postData']['text']
+                    except NameError:
+                        # Fall through for now
+                        pass
 
                     # Check for empty body, because body parameter or requestbody parameter can be not required too
                     if (paramvalue == '') and param.required:
@@ -368,7 +375,7 @@ class SingleMethod:
                         self.anomalies.append(
                             Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
                                     "Required parameter " + str(
-                                        param.name) + " was not found in request body"
+                                        param.name) + " but request body is empty"
                                     ))
                     else:
                         # Add body parameter usage if it is not empty and star analyzing schema
@@ -751,7 +758,9 @@ class ASC:
     def read_har_file(self):
         # Initialize har parser object
         # Har specification demands file to be encoded with UTF-8
-        with open(self.har_addr, 'r', encoding="utf-8") as f:
+
+        # utf-8-sig should automatically handle the situation when BOM is present
+        with open(self.har_addr, 'r', encoding="utf-8-sig") as f:
             self.harobject = HarParser(json.loads(f.read()))
 
     def read_api_specification(self):
@@ -909,6 +918,9 @@ class ASC:
         # Pages field is optional in har specification
         # But Haralyzer promises to handle this situation by creating "fake page" which contains all such entries
         # So this code should work anyway
+
+        # INFO: Haralyzer breaks if har file does not have pages field but works if it has empty pages field
+        # Always have to take care of har file containing empty array in field "pages"
 
         for page in self.harobject.pages:
             for entry in page.entries:
