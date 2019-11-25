@@ -24,6 +24,9 @@ from requests_toolbelt.multipart import decoder
 
 from utils import TerminalColors, path_parameter_extractor, find_best_mimetype_match_for_content_header
 
+import sys
+import os
+
 
 class Endpoint:
     def __init__(self, path, methods, server_address="", basepath=""):
@@ -1173,8 +1176,9 @@ class ASC:
         anomalies_sorted_by_category = sorted(anomalies_all, key=lambda x: x[0]['type'])
         anomalies_sorted_by_endpoint = sorted(anomalies_all, key=lambda x: x[1])
 
+        # Using absolute path
         env = Environment(
-            loader=FileSystemLoader('Templates/')
+            loader=FileSystemLoader(os.path.dirname(sys.argv[0]) + '/Templates')
         )
 
         template = env.get_template('anomaly_report.txt')
@@ -1216,10 +1220,9 @@ class ASC:
     def export_large_report_text(self, filename):
         all_data = self.get_all_report_data_as_dictionary()
 
-        # print(json.dumps(self.get_all_report_data_as_dictionary(), sort_keys=True, indent=4))
-
+        # Using absolute path
         env = Environment(
-           loader=FileSystemLoader('Templates/')
+            loader=FileSystemLoader(os.path.dirname(sys.argv[0]) + '/Templates')
         )
 
         template = env.get_template('large_report.txt')
