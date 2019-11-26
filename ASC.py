@@ -1244,6 +1244,10 @@ def main():
     parser.add_argument('harfile', help='Captured traffic in HAR file format')
     parser.add_argument("--cf", help="Configuration file", default="config.ini")
 
+    # Making possible to override couple of more used things from command line
+    parser.add_argument("--serveraddress", help="Address of the server. Overrides value from config file")
+    parser.add_argument("--basepath", help="Basepath to be appended to serveraddress. Overrides value from config file")
+
     args = parser.parse_args()
 
     # Get config parser
@@ -1282,6 +1286,23 @@ def main():
     server_serveraddress = config.get('SERVER_AND_BASEPATH', 'serveraddress', fallback="")
     server_basepath = config.get('SERVER_AND_BASEPATH', 'basepath', fallback="")
 
+    # Get filenamesnames for reports from configuration file
+    filename_coverage_failure = config.get('FILE_PATHS', 'report_filename_coverage_failure_report', fallback='coverage_failure_report.txt')
+    filename_anomaly_failure = config.get('FILE_PATHS', 'report_filename_anomaly_failure_report', fallback='anomaly_failure_report.txt')
+    filename_anomaly = config.get('FILE_PATHS', 'report_filename_anomaly_report', fallback='anomaly_report.txt')
+    filename_large_txt = config.get('FILE_PATHS', 'report_filename_large_report_txt', fallback='large_report_text.txt')
+    filename_large_json = config.get('FILE_PATHS', 'report_filename_large_report_json', fallback='large_report_json.json')
+
+    # Override serveraddress if given
+    if args.serveraddress is not None:
+        server_serveraddress = args.serveraddress
+
+    # Override basepath if given
+    if args.basepath is not None:
+        server_basepath = args.basepath
+
+    # TODO: More overriddedes if necessary
+
     asc = ASC(args.apispec, args.harfile,
               coverage_level_required=api_coverage_level,
               endpoints_excluded=exclude_endpoints,
@@ -1296,11 +1317,11 @@ def main():
     asc.preprocess_har_entries()
     asc.analyze()
     asc.print_analysis_to_console(suppress_console_anomalies_output)
-    asc.analyze_and_export_coverage_failure_report(config['FILE_PATHS']['report_filename_coverage_failure_report'])
-    asc.analyze_and_export_anomaly_report(config['FILE_PATHS']['report_filename_anomaly_failure_report'],
-                                          config['FILE_PATHS']['report_filename_anomaly_report'])
-    asc.export_large_report_text(config['FILE_PATHS']['report_filename_large_report_txt'])
-    asc.export_large_report_json(config['FILE_PATHS']['report_filename_large_report_json'])
+
+    asc.analyze_and_export_coverage_failure_report(filename_coverage_failure)
+    asc.analyze_and_export_anomaly_report(filename_anomaly_failure, filename_anomaly)
+    asc.export_large_report_text(filename_large_txt)
+    asc.export_large_report_json(filename_large_json)
 
     asc.crash_program(crash_on_critical_failure=crash_in_critical_failure)
 
