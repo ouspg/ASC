@@ -73,8 +73,7 @@ class Endpoint:
 
         url_parsed = urlparse(url)
 
-        # TODO: Kinda needs difference between basepath empty vs basepath not provided...
-        # TODO: Think if needed to develop in situations when server and basepath are not given
+        # Server and basepath should always be given, even if matching should succeed with empty paths too
 
         if '{' in self.path and '}' in self.path:
             # Path variable(s) exists
@@ -367,7 +366,7 @@ class SingleMethod:
                                         param.name) + " but request body is empty"
                                     ))
                     else:
-                        # Add body parameter usage if it is not empty and star analyzing schema
+                        # Add body parameter usage if it is not empty and start analyzing schema
                         param.add_usage(paramvalue)
 
                         try:
@@ -382,13 +381,10 @@ class SingleMethod:
                             # Select schema from options based on postdata mimetype
                             postdata_mimetype = entry['request']['postData']['mimeType']
 
-                            # TODO: Body should have at least schema object
-                            #  Consider making anomaly if schema is not found in spec and do not continue body analysis
-
-                            # Schema selection code
+                            # Schema selection, select best matching schema
                             selected_schema = find_best_mimetype_match_for_content_header(param.schemas.keys(), postdata_mimetype)
 
-                            # If there was no schema
+                            # If there was no schema, make anomaly
                             if not selected_schema:
                                 self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
                                                              f"Can not find any matching request mimetype from API specification for {postdata_mimetype}"))
@@ -435,39 +431,47 @@ class SingleMethod:
                         # Parsing form data with toolbelt.MultipartDecoder
                         parameter_found = False
 
-                        # TODO: Determine action if content type not found
                         postdata_contenttype = ""
                         for header in entry['request']['headers']:
                             if header['name'] == 'content-type':
                                 postdata_contenttype = header['value']
                                 break
 
-                        # Multipartdecoder wants content to be bytestring
-                        form_postdata_textcontent = bytes(entry['request']['postData']['text'], encoding='utf-8')
-
-                        dc = decoder.MultipartDecoder(form_postdata_textcontent, postdata_contenttype)
-
-                        for part in dc.parts:
-                            # Parse name field out of content-disposition
-                            key_for_dict = b'Content-Disposition'
-                            header_values = part.headers[key_for_dict].split(b"; ")
-                            name = ""
-                            for header_value in header_values:
-                                if header_value.startswith(b'name="'):
-                                    name = re.search('name="(.*?)"', str(header_value)).group(1)
-
-                            if name == param.name:
-                                param.add_usage(part.text)
-                                parameter_found = True
-                                break
-
-                        if not parameter_found and param.required:
-                            # Make required parameter not found anomaly
+                        # Stop processing and make common type anomaly if content type is not found
+                        # If content type exist, continue to parsing
+                        if postdata_contenttype == "":
                             self.anomalies.append(
-                                Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
-                                        "Required parameter " + str(
-                                            param.name) + " was not found in request form data"
-                                        ))
+                            Anomaly(entry, AnomalyType.OTHER_ANOMALY,
+                                    "Request does not contain content-type header, unable to parse formdata"
+                                    ))
+
+                        else:
+                            # Multipartdecoder wants content to be bytestring
+                            form_postdata_textcontent = bytes(entry['request']['postData']['text'], encoding='utf-8')
+
+                            dc = decoder.MultipartDecoder(form_postdata_textcontent, postdata_contenttype)
+
+                            for part in dc.parts:
+                                # Parse name field out of content-disposition
+                                key_for_dict = b'Content-Disposition'
+                                header_values = part.headers[key_for_dict].split(b"; ")
+                                name = ""
+                                for header_value in header_values:
+                                    if header_value.startswith(b'name="'):
+                                        name = re.search('name="(.*?)"', str(header_value)).group(1)
+
+                                if name == param.name:
+                                    param.add_usage(part.text)
+                                    parameter_found = True
+                                    break
+
+                            if not parameter_found and param.required:
+                                # Make required parameter not found anomaly
+                                self.anomalies.append(
+                                    Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                            "Required parameter " + str(
+                                                param.name) + " was not found in request form data"
+                                            ))
 
             # Analyzing responses
             response_code = str(entry['response']['status'])
@@ -515,19 +519,26 @@ class SingleMethod:
             if response_selection is not "":
                 for resp in self.responses:
                     if resp.code == response_selection:
-                        resp.add_usage(entry['response']['content']['text'])
+
+                        # Text field in har is optional, treat missing har as empty request body for now
+                        if 'text' in entry['response']['content']:
+                            resp.add_usage(entry['response']['content']['text'])
+                        else:
+                            resp.add_usage("")
 
                         # Currently only limited json body validation is supported
 
                         response_mimetype = entry['response']['content']['mimeType']
 
-                        # TODO: Check that there is schema in first place
-                        #  It is possible in oa v2 that schema does simply exist in response body
+                        # If schemas not available (schemas dictionary is empty), do not start validation
+                        if not resp.schemas:
+                            # No schemas available, do not continue processing
+                            break
 
                         # Schema selection for analysis
                         selected_schema = find_best_mimetype_match_for_content_header(resp.schemas.keys(),
                                                                                       response_mimetype)
-                        # If there was no schema
+                        # If there was no suitable schema or schema is not existing at all
                         if not selected_schema:
                             self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
                                                           f"Can not find any matching response schema mimetype from API specification for {response_mimetype}"))
@@ -573,6 +584,9 @@ class Schema:
     def __init__(self):
         self.payload = ""
 
+# Anomalies have enum types describing them
+# "Other anomaly" is for all uncommon misc types and anomaly description must be provided in anomaly entry description
+
 
 class AnomalyType(Enum):
     UNDEFINED_RESPONSE_CODE_DEFAULT_NOT_SPECIFIED = 1
@@ -583,8 +597,7 @@ class AnomalyType(Enum):
     INVALID_RESPONSE_BODY = 6
     UNDEFINED_METHOD_OF_ENDPOINT = 7
     UNMATCHED_REQUEST_BODY_MIMETYPE = 8
-
-# TODO: Consider sensibility of anomaly UNDEFINED_RESPONSE_CODE_DEFAULT_IS_SPECIFIED
+    OTHER_ANOMALY = 9
 
 
 class Anomaly:
