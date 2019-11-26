@@ -2,28 +2,17 @@ import json
 from haralyzer import HarParser, HarPage
 import re
 import argparse
-from argparse_utils import enum_action
-import copy
 from jsonschema import validate
 from jsonschema import validators
 from jsonschema import ValidationError
-
 from urllib.parse import urlparse
-
 from enum import Enum
-
 from prance import ResolvingParser
-
 from jinja2 import Environment, FileSystemLoader
-
 import time
-
 import configparser
-
 from requests_toolbelt.multipart import decoder
-
 from utils import TerminalColors, path_parameter_extractor, find_best_mimetype_match_for_content_header
-
 import sys
 import os
 
@@ -54,7 +43,7 @@ class Endpoint:
         self.anomalies = []
 
         # Currently endpoint level parameters are dropped to operation level (singlemethod) during parsing
-        # Operation level can override endpoint parameters, so it feels locically to handle those always there
+        # Operation level can override endpoint parameters, so it feels logically to handle those always there
         # Endpoint should be coded to handle them too if necessary
 
     def input_log_entry(self, entry):
@@ -98,7 +87,6 @@ class Endpoint:
                 # Take full match
                 # No trailing slashes allowed
                 search_pattern = "^" + re.sub('{.+?}', '[^/]*?', endpoint_path_to_compare) + "$"
-                # search_pattern = "^" + re.sub('{.+?}', '[^/]+?', endpoint_path_to_compare) + "[/]?$"
 
                 if re.search(search_pattern, url_path_to_compare):
                     return True
@@ -114,8 +102,7 @@ class Endpoint:
                 if re.search(search_pattern, url_path_to_compare):
                     return True
         else:
-            # Plain matching possible
-
+            # No path parameters present, so simple matching possible
             # Server address available, try full path match
             if self.server_address != "":
                 endpoint_path_to_compare = self.server_address + self.basepath + self.path
@@ -244,7 +231,6 @@ class SingleMethod:
 
         for response in self.responses:
             if response.usage_count == 0:
-            #if (response.code != 'default') and (response.usage_count == 0):
                 response_not_used.append(response.code)
 
         return response_not_used
@@ -304,7 +290,7 @@ class SingleMethod:
                         self.anomalies.append(Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
                                                   "Required parameter " + str(
                                                       param.name) + " was not found in request path parameters"
-                                                  ))
+                                                      ))
                     else:
                         param.add_usage(paramvalue)
 
@@ -711,7 +697,7 @@ class ASC:
 
         self.endpoints = {}
 
-        # Currently supporting only one server and basepath
+        # OpenAPI v3 has possibility to contain multiple servers, but calculations support only one server and basepath
         self.server_address = server_address
         self.server_basepath = server_basepath
 
@@ -770,7 +756,8 @@ class ASC:
         # Parse API spec to endpoint and method objects with prance parser
 
         # NOTICE: OA v2 seems to be working fine with openapi spec validator and swagger validator too
-        # NOTICE: Json seems to be working always, but some cases yaml fails (problem with strings?)
+        # NOTICE: Json seems to be working always, but some cases yaml fails
+        #   - This is probably because yaml might not have strings quoted
         try:
             specparser = ResolvingParser(self.apispec_addr, backend='openapi-spec-validator')
         except Exception as e:
@@ -943,7 +930,7 @@ class ASC:
                     self.har_filtered_out_request_urls.append(url)
 
     def analyze(self):
-        # Trigger every endppoint analysis
+        # Trigger every endpoint analysis
         for endpoint in self.endpoints.keys():
             self.endpoints[endpoint].analyze_endpoint()
 
@@ -1300,8 +1287,6 @@ def main():
     # Override basepath if given
     if args.basepath is not None:
         server_basepath = args.basepath
-
-    # TODO: More overriddedes if necessary
 
     asc = ASC(args.apispec, args.harfile,
               coverage_level_required=api_coverage_level,
