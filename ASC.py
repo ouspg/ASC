@@ -353,7 +353,7 @@ class SingleMethod:
                     paramvalue = ''
                     try:
                         paramvalue = entry['request']['postData']['text']
-                    except NameError:
+                    except KeyError:
                         # Fall through for now
                         pass
 
