@@ -16,6 +16,12 @@ from utils import TerminalColors, path_parameter_extractor, find_best_mimetype_m
 import sys
 import os
 
+# Setting location for template directory to make script executable easily from other direcotries
+PATH_TO_TEMPLATES_DIRECTORY = 'Templates'
+
+if os.path.dirname(sys.argv[0]) != '':
+    PATH_TO_TEMPLATES_DIRECTORY = os.path.dirname(sys.argv[0]) + '/Templates'
+
 
 class Endpoint:
     def __init__(self, path, methods, server_address="", basepath=""):
@@ -1176,9 +1182,8 @@ class ASC:
         anomalies_sorted_by_category = sorted(anomalies_all, key=lambda x: x[0]['type'])
         anomalies_sorted_by_endpoint = sorted(anomalies_all, key=lambda x: x[1])
 
-        # Using absolute path
         env = Environment(
-            loader=FileSystemLoader(os.path.dirname(sys.argv[0]) + '/Templates')
+            loader=FileSystemLoader(PATH_TO_TEMPLATES_DIRECTORY)
         )
 
         template = env.get_template('anomaly_report.txt')
@@ -1220,9 +1225,8 @@ class ASC:
     def export_large_report_text(self, filename):
         all_data = self.get_all_report_data_as_dictionary()
 
-        # Using absolute path
         env = Environment(
-            loader=FileSystemLoader(os.path.dirname(sys.argv[0]) + '/Templates')
+            loader=FileSystemLoader(PATH_TO_TEMPLATES_DIRECTORY)
         )
 
         template = env.get_template('large_report.txt')
