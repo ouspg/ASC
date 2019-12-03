@@ -45,6 +45,13 @@ class Endpoint:
         self.default_response_codes_in_methods_count = 0
         self.default_response_codes_in_methods_used = 0
 
+        # Not in use right now
+        self.required_parameters_in_methods_count = "NA"
+        self.required_parameters_in_methods_used = "NA"
+
+        self.parameters_in_methods_count = 0
+        self.parameters_in_methods_used = 0
+
         # Make place for anomalies which do not fit into single method
         self.anomalies = []
 
@@ -159,6 +166,10 @@ class Endpoint:
                 if self.methods[mtd].default_response_used:
                     self.default_response_codes_in_methods_used += 1
 
+            # Calculate parameters and usages
+            self.parameters_in_methods_count += len(self.methods[mtd].parameters)
+            self.parameters_in_methods_used += self.methods[mtd].parameters_used
+
     def get_methods_not_used(self):
         # Simply returns array of methods existing but not used (GET POST etc)
         methods_not_used = []
@@ -184,6 +195,8 @@ class Endpoint:
             'methods_used': self.methods_used,
             'response_codes_in_methods_count': self.response_codes_in_methods_count,
             'response_codes_in_methods_used': self.response_codes_in_methods_used,
+            'parameters_in_methods_count': self.parameters_in_methods_count,
+            'parameters_in_methods_used': self.parameters_in_methods_used,
             'methods': {},
             'anomalies': self.anomalies
         }
@@ -753,6 +766,13 @@ class ASC:
         self.total_methods_in_endpoints_count = 0
         self.total_methods_in_endpoints_used = 0
 
+        # Not yet used
+        self.total_required_parameters_count = "NA"
+        self.total_required_parameters_used = "NA"
+
+        self.total_parameters_count = 0
+        self.total_parameters_used = 0
+
         # Initiation time
         self.analysis_initiated = time.strftime("%H:%M:%S %d.%m.%Y")
 
@@ -969,6 +989,8 @@ class ASC:
                     self.har_filtered_out_request_urls.append(url)
 
     def analyze(self):
+        # May need heavy refactoring because also dict shows same data, could be combined
+
         # Trigger every endpoint analysis
         for endpoint in self.endpoints.keys():
             self.endpoints[endpoint].analyze_endpoint()
@@ -982,6 +1004,9 @@ class ASC:
 
             self.total_methods_in_endpoints_count += self.endpoints[endpoint].methods_count
             self.total_methods_in_endpoints_used += self.endpoints[endpoint].methods_used
+
+            self.total_parameters_count += self.endpoints[endpoint].parameters_in_methods_count
+            self.total_parameters_used += self.endpoints[endpoint].parameters_in_methods_used
 
             if self.endpoints[endpoint].is_used():
                 self.endpoints_used += 1
@@ -1230,7 +1255,9 @@ class ASC:
            'total_default_responses_count': self.total_default_responses_count,
            'total_default_responses_used': self.total_default_responses_used,
            'total_methods_in_endpoints_count': self.total_methods_in_endpoints_count,
-           'total_methods_in_endpoints_used': self.total_methods_in_endpoints_used
+           'total_methods_in_endpoints_used': self.total_methods_in_endpoints_used,
+            'total_parameters_count': self.total_parameters_count,
+            'total_parameters_used': self.total_parameters_used
         }
 
         endpoint_dictionaries = []

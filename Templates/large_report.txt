@@ -22,9 +22,10 @@ Total number of explicit response codes: {{data.total_response_codes_count}}
 Total number of explicit response codes used: {{data.total_response_codes_used}}
 
 Total number of default responses codes: {{data.total_default_responses_count}}
-Total number of default responses codes used: {{data.total_default_responses_used}}
+Total number of default responses codes (presumably) used: {{data.total_default_responses_used}}
 
-TODO: Consider if it would be useful to add total parameters count etc
+Total number of parameters: {{data.total_parameters_count}}
+Total number of parameters used: {{data.total_parameters_used}}
 
 TODO: Consider if coverage/anomaly failures should be shown here too
 
@@ -55,14 +56,12 @@ Endpoint: {{endpoint.path}}
                 {% for ubv in response.unique_body_values %}
                     {{ubv}}
                 {% endfor %}
-                Schema: TODO: Add if neccessary
             {% endfor %}
         Parameters:
             {% for parameter in method.parameters %}
             Parameter name: {{parameter.name}}
                 Location: {{parameter.location}}
                 Required: {{parameter.required}}
-                Schema: TODO: Add if neccessary
                 Usage count: {{parameter.usage_count}}
                 Unique values: {{parameter.unique_values_count}}
                 {% for uv in parameter.unique_values %}
