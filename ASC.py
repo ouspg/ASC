@@ -792,6 +792,13 @@ class ASC:
         # Anomaly types, which will cause the crash of program aka "critical anomalies"
         self.anomaly_types_causing_crash = anomaly_types_causing_crash
 
+        # Results from coverage analysis
+        self.coverage_level_failure_reasons = []
+
+        # Results from anomaly analysis
+        self.anomalies_all = []
+        self.anomalies_critical = []
+
     def read_har_file(self):
         # Initialize har parser object
         # Har specification demands file to be encoded with UTF-8
@@ -1094,9 +1101,6 @@ class ASC:
         If failures exist, return true, otherwise false in order to main function to crash program
         :return:
         '''
-        # Coverage based on given level to determine if failed or not and failure reasons as string array
-        coverage_level_fulfilled = True
-        coverage_level_failure_reasons = []
 
         if self.coverage_level_required == ApiCoverageLevel.COVERAGE_DISABLED:
             # Failure analysis and failure report is not made at all
@@ -1109,9 +1113,9 @@ class ASC:
                     continue
 
                 if not self.endpoints[endpoint].is_used():
-                    coverage_level_fulfilled = False
+                    self.coverage_requirement_passed = False
                     # Add failure and reason
-                    coverage_level_failure_reasons.append(f"Endpoint {endpoint} is not used")
+                    self.coverage_level_failure_reasons.append(f"Endpoint {endpoint} is not used")
 
         if self.coverage_level_required == ApiCoverageLevel.COVERAGE_METHOD:
             # Check method coverage
@@ -1121,9 +1125,9 @@ class ASC:
                     continue
 
                 if len(self.endpoints[endpoint].get_methods_not_used()) > 0:
-                    coverage_level_fulfilled = False
+                    self.coverage_requirement_passed = False
                     for mtd in self.endpoints[endpoint].get_methods_not_used():
-                        coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} is not used")
+                        self.coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} is not used")
 
         if self.coverage_level_required == ApiCoverageLevel.COVERAGE_RESPONSE:
             # Check response coverage
@@ -1138,8 +1142,8 @@ class ASC:
                         # If default response is treated like others, also it will cause coverage error
                         if not self.coverage_default_response_as_normal_response and resp == 'default':
                             continue
-                        coverage_level_fulfilled = False
-                        coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} response {resp} is not used")
+                        self.coverage_requirement_passed = False
+                        self.coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method {mtd} response {resp} is not used")
 
         if self.parameter_coverage_level_required in [ParameterCoverageLevel.COVERAGE_USED_ONCE, ParameterCoverageLevel.COVERAGE_USED_TWICE_UNIQUELY]:
             # Check parameter coverage
@@ -1155,16 +1159,14 @@ class ASC:
                     for param in self.endpoints[endpoint].methods[mtd].parameters:
                         if self.parameter_coverage_level_required == ParameterCoverageLevel.COVERAGE_USED_ONCE:
                             if param.usage_count == 0:
-                                coverage_level_fulfilled = False
-                                coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} not used")
+                                self.coverage_requirement_passed = False
+                                self.coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} not used")
                         elif self.parameter_coverage_level_required == ParameterCoverageLevel.COVERAGE_USED_TWICE_UNIQUELY:
                             if len(param.unique_values) < 2:
-                                coverage_level_fulfilled = False
-                                coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} used uniquely {len(param.unique_values)} times. 2 unique usages required to fullfill this coverage requirement")
+                                self.coverage_requirement_passed = False
+                                self.coverage_level_failure_reasons.append(f"Endpoint's {endpoint} method's' {mtd} parameter {param.name} used uniquely {len(param.unique_values)} times. 2 unique usages required to fullfill this coverage requirement")
 
-        return coverage_level_fulfilled, coverage_level_failure_reasons
-
-    def analyze_and_export_coverage_failure_report(self, failure_report_filename):
+    def export_coverage_failure_report(self, failure_report_filename):
         '''
         Saves the failure report to specified filename
         Name of the file is specified by command line arg failurereportname
@@ -1173,59 +1175,58 @@ class ASC:
         :return:
         '''
 
-        coverage_level_achieved, failures = self.analyze_coverage()
-
-        self.coverage_requirement_passed = coverage_level_achieved
-
         # Keeping failure report as minimal as possible for now
         with open(failure_report_filename, 'w') as file:
-            for fail in failures:
+            for fail in self.coverage_level_failure_reasons:
                 file.write(fail + "\n")
 
-    def analyze_and_export_anomaly_report(self, anomaly_report_filename, critical_anomaly_report_filename):
+    def analyze_anomalies(self):
         '''
-        :param anomaly_report_filename:
-        Creates report listing only anomalies
-        Anomalies categorized under each endpoint and type
-        If crashing anomaly is found, write those to separate file and crash the program later
-        :return:
+        Analyze anomalies and save all anomalies and separate critical ones
         '''
-        # For now use simple text file for failure report
-        with open(critical_anomaly_report_filename, 'w') as file:
-            for endpoint in self.endpoints.keys():
-                # Check endpoint anomalies
-                for endpoint_anomaly in self.endpoints[endpoint].anomalies:
-                    if endpoint_anomaly.type in self.anomaly_types_causing_crash:
-                        # Critical failure anomaly encountered
-                        file.write(endpoint_anomaly.description + "\n")
-                        file.write(str(endpoint_anomaly.entry) + "\n")
-                        self.anomaly_requirements_passed = False
 
-                # Check anomalies in endpoints method
-                for method in self.endpoints[endpoint].methods.keys():
-                    for anomaly in self.endpoints[endpoint].methods[method].anomalies:
-                        if anomaly.type in self.anomaly_types_causing_crash:
-                            # Critical failure anomaly encountered
-                            file.write(anomaly.description + "\n")
-                            file.write(str(anomaly.entry) + "\n")
-                            self.anomaly_requirements_passed = False
-
-        # Use more complex template for larger anomaly report
-        # All anomalies as tuple (Anomaly, place_of_occurrence)
-        anomalies_all = []
-
+        # Collect all anomalies
         for endpoint in self.endpoints.keys():
-            for method in self.endpoints[endpoint].methods.keys():
-                for anomaly in self.endpoints[endpoint].methods[method].anomalies:
-                    place_of_occurrence = f"Endpoint {endpoint} - method {method.upper()}"
-                    anomalies_all.append((anomaly.get_as_dictionary(), place_of_occurrence))
-
-            for anomaly in self.endpoints[endpoint].anomalies:
+            # Check endpoint anomalies
+            for endpoint_anomaly in self.endpoints[endpoint].anomalies:
                 place_of_occurrence = f"Endpoint {endpoint}"
-                anomalies_all.append((anomaly.get_as_dictionary(), place_of_occurrence))
+                self.anomalies_all.append((endpoint_anomaly, place_of_occurrence))
 
-        anomalies_sorted_by_category = sorted(anomalies_all, key=lambda x: x[0]['type'])
-        anomalies_sorted_by_endpoint = sorted(anomalies_all, key=lambda x: x[1])
+            # Check anomalies in endpoints method
+            for method in self.endpoints[endpoint].methods.keys():
+                place_of_occurrence = f"Endpoint {endpoint} - method {method.upper()}"
+                for anomaly in self.endpoints[endpoint].methods[method].anomalies:
+                    self.anomalies_all.append((anomaly, place_of_occurrence))
+
+        # Append any critical anomaly to critical anomaly list
+        for anomaly, place in self.anomalies_all:
+            if anomaly.type in self.anomaly_types_causing_crash:
+                self.anomalies_critical.append((anomaly, place))
+                self.anomaly_requirements_passed = False
+
+    def export_anomalies_report(self, critical_anomaly_report_filename, anomaly_report_filename):
+        '''
+        Export anomalies reports
+        '''
+
+        # Critical anomaly report
+        with open(critical_anomaly_report_filename, 'w') as file:
+            for anomaly, place_of_anomaly in self.anomalies_critical:
+                file.write(place_of_anomaly + "\n")
+                file.write(anomaly.description + "\n")
+                file.write(str(anomaly.entry) + "\n\n")
+
+        # All anomalies report
+
+        # Translate data to dict representation before sorting and feeding to file template
+        all_anomalies_as_dict = []
+
+        for anomaly, place in self.anomalies_all:
+            all_anomalies_as_dict.append((anomaly.get_as_dictionary(), place))
+
+        # Sort by 2 different ways
+        anomalies_sorted_by_category = sorted(all_anomalies_as_dict, key=lambda x: x[0]['type'])
+        anomalies_sorted_by_endpoint = sorted(all_anomalies_as_dict, key=lambda x: x[1])
 
         env = Environment(
             loader=FileSystemLoader(PATH_TO_TEMPLATES_DIRECTORY)
@@ -1367,8 +1368,12 @@ def main():
     asc.analyze()
     asc.print_analysis_to_console(suppress_console_anomalies_output)
 
-    asc.analyze_and_export_coverage_failure_report(filename_coverage_failure)
-    asc.analyze_and_export_anomaly_report(filename_anomaly_failure, filename_anomaly)
+    asc.analyze_coverage()
+    asc.export_coverage_failure_report(filename_coverage_failure)
+
+    asc.analyze_anomalies()
+    asc.export_anomalies_report(filename_anomaly_failure, filename_anomaly)
+
     asc.export_large_report_text(filename_large_txt)
     asc.export_large_report_json(filename_large_json)
 
