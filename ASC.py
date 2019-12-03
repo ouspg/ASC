@@ -69,13 +69,18 @@ class Endpoint:
                 description=f"Call of undefined method {method_type} of the endpoint"
             ))
 
-    def match_url_to_path(self, url):
+    def match_url_to_path(self, url, use_path_parameters=True):
         '''
         Just determines if url matches this endpoints path
         :param url:
         :param basepath:
+        :param use_path_parameters:
         :return boolean:
         '''
+
+        # First round url match check should consider always matching non-path parameter paths
+        # Because url path like /user/login would not accidentally match to /user/{username}
+        # So if use_path_parameters is set to false and path parameters are present, automatical false response should be result
 
         url_parsed = urlparse(url)
 
@@ -83,6 +88,10 @@ class Endpoint:
 
         if '{' in self.path and '}' in self.path:
             # Path variable(s) exists
+
+            # Produce automatical false if path parameters are forbidden on search
+            if not use_path_parameters:
+                return False
 
             # Server address exists
             if self.server_address != "":
@@ -936,12 +945,23 @@ class ASC:
                 self.total_har_entries = self.total_har_entries + 1
                 url = entry['request']['url']
                 endpoint_found = False
+
+                # First round of matching with no path parameters used
                 for endpoint in self.endpoints.keys():
-                    if self.endpoints[endpoint].match_url_to_path(url):
+                    if self.endpoints[endpoint].match_url_to_path(url, use_path_parameters=False):
                         self.endpoints[endpoint].input_log_entry(entry)
                         endpoint_found = True
                         self.total_api_usages = self.total_api_usages + 1
                         break
+
+                if not endpoint_found:
+                    # Second round of matching with path parameters available if not found on first round
+                    for endpoint in self.endpoints.keys():
+                        if self.endpoints[endpoint].match_url_to_path(url):
+                            self.endpoints[endpoint].input_log_entry(entry)
+                            endpoint_found = True
+                            self.total_api_usages = self.total_api_usages + 1
+                            break
 
                 # Print notification and add url to list of filtered out urls
                 if not endpoint_found:
