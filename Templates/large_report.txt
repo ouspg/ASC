@@ -27,6 +27,9 @@ Total number of default responses codes (presumably) used: {{data.total_default_
 Total number of parameters: {{data.total_parameters_count}}
 Total number of parameters used: {{data.total_parameters_used}}
 
+Detailed anomaly output suppressed: {{suppress_anomaly_details}}
+Log entries omitted from output: {{suppress_log_entries}}
+
 TODO: Consider if coverage/anomaly failures should be shown here too
 
 Endpoints:
@@ -70,14 +73,14 @@ Endpoint: {{endpoint.path}}
             {% endfor %}
         Anomalies:
             {% for anomaly in method.anomalies %}
-                Description: {{anomaly.description}}
-                Entry: {{anomaly.entry}}
+                ID: {{anomaly.unique_id}} Description: {{anomaly.description}}{% if not suppress_anomaly_details %}
+                Entry: {{anomaly.entry}}{% endif %}
             {% endfor %}
-
+        {% if not suppress_log_entries %}
         Logs:
             {% for entry in method.logs %}
                 {{entry}}
             {% endfor %}
-
+        {% endif %}
     {% endfor %}
 {% endfor %}
