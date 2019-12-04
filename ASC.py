@@ -16,6 +16,8 @@ from utils import TerminalColors, path_parameter_extractor, find_best_mimetype_m
 import sys
 import os
 
+import itertools
+
 # Setting location for template directory to make script executable easily from other direcotries
 PATH_TO_TEMPLATES_DIRECTORY = 'Templates'
 
@@ -629,16 +631,21 @@ class AnomalyType(Enum):
 
 
 class Anomaly:
+    # Making anomaly to have unique id
+    iter_id = itertools.count()
+
     def __init__(self, entry, type, description):
         self.entry = entry
         self.type = type
         self.description = description
+        self.unique_id = next(Anomaly.iter_id)
 
     def get_as_dictionary(self):
         anomaly_dictionary = {
             'entry': self.entry,
             'type': self.type.value,
-            'description': self.description
+            'description': self.description,
+            'unique_id': self.unique_id
         }
 
         return anomaly_dictionary
@@ -1213,6 +1220,7 @@ class ASC:
         with open(critical_anomaly_report_filename, 'w') as file:
             for anomaly, place_of_anomaly in self.anomalies_critical:
                 file.write(place_of_anomaly + "\n")
+                file.write("Given unique id for anomaly: " + str(anomaly.unique_id) + "\n")
                 file.write(anomaly.description + "\n")
                 file.write(str(anomaly.entry) + "\n\n")
 
