@@ -1333,7 +1333,8 @@ def main():
     critical_anomalies = []
 
     for ca in critical_anomalies_config.split(','):
-        critical_anomalies.append(AnomalyType[ca])
+        if len(ca) > 0:
+            critical_anomalies.append(AnomalyType[ca])
 
     # Get misc settings
     crash_in_critical_failure = config.getboolean('MISC', 'crash_in_critical_failure', fallback=True)
@@ -1344,7 +1345,8 @@ def main():
     exclude_endpoints = []
 
     for ee in exclude_endpoints_config.split(','):
-        exclude_endpoints.append(ee)
+        if len(ee) > 0:
+            exclude_endpoints.append(ee)
 
     # Get server and basepath from configuration file
     # If not found, empty string should be default
