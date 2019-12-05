@@ -45,7 +45,7 @@ Endpoint: {{endpoint.path}}
     Methods of endpoint:
     {% for type, method in endpoint.methods.items() %}
         Type: {{type}}
-
+        Usage count: {{method.usage_count}}
         Responses:
             {% for response in method.responses %}
             {% if response.code == 'default' %}
