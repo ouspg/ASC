@@ -72,6 +72,7 @@ Endpoint: {{endpoint.path}}
                 {% endfor %}{% endif %}
             {% endfor %}
         Anomalies:
+            Anomaly count: {{method.anomalies_count}}
             {% for anomaly in method.anomalies %}
                 ID: {{anomaly.unique_id}} Description: {{anomaly.description}}{% if not suppress_anomaly_details %}
                 Entry: {{anomaly.entry}}{% endif %}
