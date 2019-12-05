@@ -67,9 +67,9 @@ Endpoint: {{endpoint.path}}
                 Required: {{parameter.required}}
                 Usage count: {{parameter.usage_count}}
                 Unique values: {{parameter.unique_values_count}}
-                {% for uv in parameter.unique_values %}
+                {% if not suppress_parameter_unique_values %}{% for uv in parameter.unique_values %}
                     {{uv}}
-                {% endfor %}
+                {% endfor %}{% endif %}
             {% endfor %}
         Anomalies:
             {% for anomaly in method.anomalies %}

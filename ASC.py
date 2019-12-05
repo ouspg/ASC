@@ -1278,7 +1278,9 @@ class ASC:
 
         return all_data_dictionary
 
-    def export_large_report_text(self, filename, suppress_anomaly_details=False, suppress_log_entries=False):
+    def export_large_report_text(self, filename, suppress_anomaly_details=False,
+                                 suppress_log_entries=False,
+                                 suppress_parameter_unique_values=False):
         all_data = self.get_all_report_data_as_dictionary()
 
         env = Environment(
@@ -1289,7 +1291,8 @@ class ASC:
 
         template.stream(data=all_data,
                         suppress_anomaly_details=suppress_anomaly_details,
-                        suppress_log_entries=suppress_log_entries).dump(filename)
+                        suppress_log_entries=suppress_log_entries,
+                        suppress_parameter_unique_values=suppress_parameter_unique_values).dump(filename)
 
     def crash_program(self, crash_on_critical_failure=True):
         # Crash program with exit code 1 if needed and not suppressed
@@ -1368,6 +1371,8 @@ def main():
 
     suppress_large_textual_report_logs_output = config.getboolean('MISC', 'suppress_large_textual_report_logs_output', fallback=False)
 
+    suppress_large_textual_report_parameter_unique_values_output = config.getboolean('MISC', 'suppress_large_textual_report_parameter_unique_values_output',
+                                                                  fallback=False)
 
     asc = ASC(args.apispec, args.harfile,
               coverage_level_required=api_coverage_level,
@@ -1392,7 +1397,8 @@ def main():
 
     asc.export_large_report_text(filename_large_txt,
                                  suppress_anomaly_details=suppress_large_textual_report_anomalies_detailed_output,
-                                 suppress_log_entries=suppress_large_textual_report_logs_output)
+                                 suppress_log_entries=suppress_large_textual_report_logs_output,
+                                 suppress_parameter_unique_values=suppress_large_textual_report_parameter_unique_values_output)
     asc.export_large_report_json(filename_large_json)
 
     asc.crash_program(crash_on_critical_failure=crash_in_critical_failure)
