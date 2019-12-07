@@ -570,7 +570,7 @@ class SingleMethod:
                                                                                       response_mimetype)
                         # If there was no suitable schema or schema is not existing at all
                         if not selected_schema:
-                            self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_REQUEST_BODY_MIMETYPE,
+                            self.anomalies.append(Anomaly(entry, AnomalyType.UNMATCHED_RESPONSE_BODY_MIMETYPE,
                                                           f"Can not find any matching response schema mimetype from API specification for {response_mimetype}"))
                         else:
                             sch = json.loads(json.dumps(resp.schemas[selected_schema]))
@@ -627,7 +627,8 @@ class AnomalyType(Enum):
     INVALID_RESPONSE_BODY = 6
     UNDEFINED_METHOD_OF_ENDPOINT = 7
     UNMATCHED_REQUEST_BODY_MIMETYPE = 8
-    OTHER_ANOMALY = 9
+    UNMATCHED_RESPONSE_BODY_MIMETYPE = 9
+    OTHER_ANOMALY = 10
 
 
 class Anomaly:
