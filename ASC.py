@@ -871,6 +871,10 @@ class ASC:
             mthds = {}
 
             for method in paths[endpoint].keys():
+                # Check that common parameters field of this endpoint is not accidentally processed
+                if method == 'parameters':
+                    continue
+
                 # Operation params can override endpoint params
                 params_operation = []
                 responses_operation = []
