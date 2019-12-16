@@ -32,6 +32,8 @@ Log entries omitted from output: {{suppress_log_entries}}
 
 TODO: Consider if coverage/anomaly failures should be shown here too
 
+NOTE: SOME SPECIAL CHARACTERS CAUSING POTENTIALLY ERRORS WHEN ARE POTENTIALLY LOST IN PARAMETERS UNIQUE VALUES SECTION
+
 Endpoints:
 
 {% for endpoint in data.endpoints %}
@@ -68,7 +70,7 @@ Endpoint: {{endpoint.path}}
                 Usage count: {{parameter.usage_count}}
                 Unique values: {{parameter.unique_values_count}}
                 {% if not suppress_parameter_unique_values %}{% for uv in parameter.unique_values %}
-                    {{uv}}
+                    {{uv.encode('utf-16', 'surrogatepass').decode('utf-16', errors='ignore')}}
                 {% endfor %}{% endif %}
             {% endfor %}
         Anomalies:
