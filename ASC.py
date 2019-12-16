@@ -955,7 +955,7 @@ class ASC:
 
                 # Add endpoint parameters to final parameters if those are not overriden in method
                 for p_e in params_endpoint:
-                    if not any(p_o.name == p_e for p_o in params_operation):
+                    if not any(p_o.name == p_e.name for p_o in params_operation):
                         params_final.append(p_e)
 
                 # Add all operation parameters to final array
