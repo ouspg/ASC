@@ -200,10 +200,18 @@ class Endpoint:
             'parameters_in_methods_count': self.parameters_in_methods_count,
             'parameters_in_methods_used': self.parameters_in_methods_used,
             'methods': {},
-            'anomalies': self.anomalies
+            'anomalies': []
         }
         for method_type in self.methods.keys():
             endpoint_dict['methods'][method_type] = self.methods[method_type].get_as_dictionary()
+
+        # Add endpoint anomalies as dictionary
+        anoms = []
+
+        for a in self.anomalies:
+            anoms.append(a.get_as_dictionary())
+
+        endpoint_dict['anomalies'] = anoms
 
         return endpoint_dict
 
