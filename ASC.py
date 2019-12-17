@@ -16,6 +16,8 @@ from utils import TerminalColors, path_parameter_extractor, find_best_mimetype_m
 import sys
 import os
 
+import copy
+
 import itertools
 
 # Setting location for template directory to make script executable easily from other direcotries
@@ -964,7 +966,8 @@ class ASC:
                 # Add endpoint parameters to final parameters if those are not overriden in method
                 for p_e in params_endpoint:
                     if not any(p_o.name == p_e.name for p_o in params_operation):
-                        params_final.append(p_e)
+                        # Deep copy must be used because parameter objects must be owned by operation
+                        params_final.append(copy.deepcopy(p_e))
 
                 # Add all operation parameters to final array
                 params_final.extend(params_operation)
