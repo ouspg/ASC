@@ -885,6 +885,10 @@ class ASC:
                 if method == 'parameters':
                     continue
 
+                # Ensure that method is real http method and not some extended patterned field
+                if method.lower() not in ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']:
+                    continue
+
                 # Operation params can override endpoint params
                 params_operation = []
                 responses_operation = []
