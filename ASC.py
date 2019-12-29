@@ -1396,6 +1396,9 @@ def main():
     suppress_large_textual_report_parameter_unique_values_output = config.getboolean('MISC', 'suppress_large_textual_report_parameter_unique_values_output',
                                                                   fallback=False)
 
+    # Get option of usage of minimal output (json report only), default is not to use it
+    output_report_json_only = config.getboolean('MISC', 'output_report_json_only', fallback=False)
+
     asc = ASC(args.apispec, args.harfile,
               coverage_level_required=api_coverage_level,
               endpoints_excluded=exclude_endpoints,
@@ -1412,15 +1415,20 @@ def main():
     asc.print_analysis_to_console(suppress_console_anomalies_output)
 
     asc.analyze_coverage()
-    asc.export_coverage_failure_report(filename_coverage_failure)
+    if not output_report_json_only:
+        asc.export_coverage_failure_report(filename_coverage_failure)
 
     asc.analyze_anomalies()
-    asc.export_anomalies_report(filename_anomaly_failure, filename_anomaly)
 
-    asc.export_large_report_text(filename_large_txt,
+    if not output_report_json_only:
+        asc.export_anomalies_report(filename_anomaly_failure, filename_anomaly)
+
+    if not output_report_json_only:
+        asc.export_large_report_text(filename_large_txt,
                                  suppress_anomaly_details=suppress_large_textual_report_anomalies_detailed_output,
                                  suppress_log_entries=suppress_large_textual_report_logs_output,
                                  suppress_parameter_unique_values=suppress_large_textual_report_parameter_unique_values_output)
+
     asc.export_large_report_json(filename_large_json)
 
     asc.crash_program(crash_on_critical_failure=crash_in_critical_failure)
