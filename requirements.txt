@@ -10,7 +10,7 @@ jsonschema==3.0.2
 MarkupSafe==1.1.1
 openapi-spec-validator==0.2.8
 pathlib==1.0.1
-prance==0.16.0
+prance==0.17.0
 pyrsistent==0.15.4
 python-dateutil==2.8.0
 PyYAML==5.1.2
