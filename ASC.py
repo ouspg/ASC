@@ -450,60 +450,16 @@ class SingleMethod:
                     # Form data parameters can be found either params field or content field in HAR
                     # Parsing and analyzing data from there
 
-                    if 'params' in entry['request']['postData']:
-                        parameter_found = False
-                        for formparam in entry['request']['postData']['params']:
-                            if formparam['name'] == param.name:
-                                paramvalue = formparam['value']
-                                param.add_usage(paramvalue)
-                                parameter_found = True
+                    # Check if postdata exists in the first place:
+                    if 'postData' in entry['request']:
 
-                        if not parameter_found and param.required:
-                            # Make required parameter not found anomaly
-                            self.anomalies.append(
-                                Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
-                                        "Required parameter " + str(
-                                            param.name) + " was not found in request form data"
-                                        ))
-
-                    elif 'text' in entry['request']['postData']:
-                        # Form parameters can be found in text field of HAR too, which case special parsing is required
-                        # Parsing form data with toolbelt.MultipartDecoder
-                        parameter_found = False
-
-                        postdata_contenttype = ""
-                        for header in entry['request']['headers']:
-                            if header['name'] == 'content-type':
-                                postdata_contenttype = header['value']
-                                break
-
-                        # Stop processing and make common type anomaly if content type is not found
-                        # If content type exist, continue to parsing
-                        if postdata_contenttype == "":
-                            self.anomalies.append(
-                            Anomaly(entry, AnomalyType.OTHER_ANOMALY,
-                                    "Request does not contain content-type header, unable to parse formdata"
-                                    ))
-
-                        else:
-                            # Multipartdecoder wants content to be bytestring
-                            form_postdata_textcontent = bytes(entry['request']['postData']['text'], encoding='utf-8')
-
-                            dc = decoder.MultipartDecoder(form_postdata_textcontent, postdata_contenttype)
-
-                            for part in dc.parts:
-                                # Parse name field out of content-disposition
-                                key_for_dict = b'Content-Disposition'
-                                header_values = part.headers[key_for_dict].split(b"; ")
-                                name = ""
-                                for header_value in header_values:
-                                    if header_value.startswith(b'name="'):
-                                        name = re.search('name="(.*?)"', str(header_value)).group(1)
-
-                                if name == param.name:
-                                    param.add_usage(part.text)
+                        if 'params' in entry['request']['postData']:
+                            parameter_found = False
+                            for formparam in entry['request']['postData']['params']:
+                                if formparam['name'] == param.name:
+                                    paramvalue = formparam['value']
+                                    param.add_usage(paramvalue)
                                     parameter_found = True
-                                    break
 
                             if not parameter_found and param.required:
                                 # Make required parameter not found anomaly
@@ -512,6 +468,62 @@ class SingleMethod:
                                             "Required parameter " + str(
                                                 param.name) + " was not found in request form data"
                                             ))
+
+                        elif 'text' in entry['request']['postData']:
+                            # Form parameters can be found in text field of HAR too, which case special parsing is required
+                            # Parsing form data with toolbelt.MultipartDecoder
+                            parameter_found = False
+
+                            postdata_contenttype = ""
+                            for header in entry['request']['headers']:
+                                if header['name'] == 'content-type':
+                                    postdata_contenttype = header['value']
+                                    break
+
+                            # Stop processing and make common type anomaly if content type is not found
+                            # If content type exist, continue to parsing
+                            if postdata_contenttype == "":
+                                self.anomalies.append(
+                                Anomaly(entry, AnomalyType.OTHER_ANOMALY,
+                                        "Request does not contain content-type header, unable to parse formdata"
+                                        ))
+
+                            else:
+                                # Multipartdecoder wants content to be bytestring
+                                form_postdata_textcontent = bytes(entry['request']['postData']['text'], encoding='utf-8')
+
+                                dc = decoder.MultipartDecoder(form_postdata_textcontent, postdata_contenttype)
+
+                                for part in dc.parts:
+                                    # Parse name field out of content-disposition
+                                    key_for_dict = b'Content-Disposition'
+                                    header_values = part.headers[key_for_dict].split(b"; ")
+                                    name = ""
+                                    for header_value in header_values:
+                                        if header_value.startswith(b'name="'):
+                                            name = re.search('name="(.*?)"', str(header_value)).group(1)
+
+                                    if name == param.name:
+                                        param.add_usage(part.text)
+                                        parameter_found = True
+                                        break
+
+                                if not parameter_found and param.required:
+                                    # Make required parameter not found anomaly
+                                    self.anomalies.append(
+                                        Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                                "Required parameter " + str(
+                                                    param.name) + " was not found in request form data"
+                                                ))
+                    else:
+                        # Postdata does not exist at all, produce required parameter missing anomaly if it was required
+                        if param.required:
+                            # Make required parameter not found anomaly
+                            self.anomalies.append(
+                                Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                        "Required parameter " + str(
+                                            param.name) + " was not found, post data does not exist in har file"
+                                        ))
 
             # Analyzing responses
             response_code = str(entry['response']['status'])
