@@ -453,6 +453,8 @@ class SingleMethod:
                     # Check if postdata exists in the first place:
                     if 'postData' in entry['request']:
                         parameter_found = False
+
+                        # Look for urlencoded form data
                         if 'params' in entry['request']['postData']:
                             for formparam in entry['request']['postData']['params']:
                                 if formparam['name'] == param.name:
@@ -480,6 +482,12 @@ class SingleMethod:
                                 Anomaly(entry, AnomalyType.OTHER_ANOMALY,
                                         "Request does not contain content-type header, unable to parse formdata"
                                         ))
+
+                            elif postdata_contenttype == "application/x-www-form-urlencoded":
+                                # This means that content should have been in params section
+                                # Trying to parse content would produce only parsing error so treat as empty
+                                # Produces later anomaly of parameter not found if necessary
+                                pass
 
                             else:
                                 # Multipartdecoder wants content to be bytestring
