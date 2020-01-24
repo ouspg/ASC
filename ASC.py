@@ -452,27 +452,20 @@ class SingleMethod:
 
                     # Check if postdata exists in the first place:
                     if 'postData' in entry['request']:
-
+                        parameter_found = False
                         if 'params' in entry['request']['postData']:
-                            parameter_found = False
                             for formparam in entry['request']['postData']['params']:
                                 if formparam['name'] == param.name:
                                     paramvalue = formparam['value']
                                     param.add_usage(paramvalue)
                                     parameter_found = True
+                                    break
 
-                            if not parameter_found and param.required:
-                                # Make required parameter not found anomaly
-                                self.anomalies.append(
-                                    Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
-                                            "Required parameter " + str(
-                                                param.name) + " was not found in request form data"
-                                            ))
+                        # If not found in har parameter section, look at raw text content instead
 
-                        elif 'text' in entry['request']['postData']:
+                        if ('text' in entry['request']['postData']) and (not parameter_found):
                             # Form parameters can be found in text field of HAR too, which case special parsing is required
                             # Parsing form data with toolbelt.MultipartDecoder
-                            parameter_found = False
 
                             postdata_contenttype = ""
                             for header in entry['request']['headers']:
@@ -508,13 +501,13 @@ class SingleMethod:
                                         parameter_found = True
                                         break
 
-                                if not parameter_found and param.required:
-                                    # Make required parameter not found anomaly
-                                    self.anomalies.append(
-                                        Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
-                                                "Required parameter " + str(
-                                                    param.name) + " was not found in request form data"
-                                                ))
+                        if not parameter_found and param.required:
+                            # Make required parameter not found anomaly
+                            self.anomalies.append(
+                                Anomaly(entry, AnomalyType.MISSING_REQUIRED_REQUEST_PARAMETER,
+                                        "Required parameter " + str(
+                                            param.name) + " was not found in request form data"
+                                        ))
                     else:
                         # Postdata does not exist at all, produce required parameter missing anomaly if it was required
                         if param.required:
