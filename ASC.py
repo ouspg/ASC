@@ -469,7 +469,7 @@ class SingleMethod:
 
                             postdata_contenttype = ""
                             for header in entry['request']['headers']:
-                                if header['name'] == 'content-type':
+                                if (header['name'] == 'content-type') or (header['name'] == 'Content-Type'):
                                     postdata_contenttype = header['value']
                                     break
 
