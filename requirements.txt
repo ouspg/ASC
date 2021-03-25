@@ -13,7 +13,7 @@ pathlib==1.0.1
 prance==0.17.0
 pyrsistent==0.15.4
 python-dateutil==2.8.0
-PyYAML==5.1.2
+PyYAML==5.4
 regex==2019.8.19
 requests==2.22.0
 requests-toolbelt==0.9.1
