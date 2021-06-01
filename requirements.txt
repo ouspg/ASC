@@ -21,4 +21,4 @@ semver==2.8.1
 six==1.12.0
 swagger-parser==1.0.1
 swagger-spec-validator==2.4.3
-urllib3==1.24.3
+urllib3==1.26.5
