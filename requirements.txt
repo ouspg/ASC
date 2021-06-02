@@ -15,10 +15,10 @@ pyrsistent==0.15.4
 python-dateutil==2.8.0
 PyYAML==5.4
 regex==2019.8.19
-requests==2.22.0
+requests==2.25.1
 requests-toolbelt==0.9.1
 semver==2.8.1
 six==1.12.0
 swagger-parser==1.0.1
 swagger-spec-validator==2.4.3
-urllib3==1.24.3
+urllib3==1.26.5
