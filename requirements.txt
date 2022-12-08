@@ -1,7 +1,7 @@
 argparse-utils==1.2.0
 attrs==19.1.0
 cached-property==1.5.1
-certifi==2019.9.11
+certifi==2022.12.7
 chardet==3.0.4
 haralyzer==1.8.0
 idna==2.8
